@@ -36,7 +36,7 @@ async function handleRequestWarmerJob(socket) {
 
         await connection.commit();
 
-        console.log(`[Warmer] Job ${job.id} (${job.tipo}) asignado a worker ${socket.workerId}`);
+        // console.log(`[Warmer] Job ${job.id} (${job.tipo}) asignado a worker ${socket.workerId}`);
 
         socket.send(JSON.stringify({
             type: 'warmer_job',
@@ -113,7 +113,7 @@ async function handleWarmerNext(socket, data) {
             );
             await connection.commit();
 
-            console.log(`[Warmer] Job ${job_id} completado: ${job.cuentas_exitosas} ok, ${job.cuentas_error} errores (real: ${realTotal})`);
+            // console.log(`[Warmer] Job ${job_id} completado: ${job.cuentas_exitosas} ok, ${job.cuentas_error} errores (real: ${realTotal})`);
 
             socket.send(JSON.stringify({
                 type: 'warmer_done',
@@ -180,7 +180,7 @@ async function handleWarmerNext(socket, data) {
 
         await connection.commit();
 
-        console.log(`[Warmer] Job ${job_id}: cuenta @${account.nick} → @${nicks[0].nick} (${job.cuentas_ejecutadas + 1}/${job.total_cuentas})`);
+        // console.log(`[Warmer] Job ${job_id}: cuenta @${account.nick} → @${nicks[0].nick} (${job.cuentas_ejecutadas + 1}/${job.total_cuentas})`);
 
         socket.send(JSON.stringify({
             type: 'warmer_target',
@@ -313,7 +313,7 @@ async function handleWarmerResult(socket, data) {
 
         await connection.commit();
 
-        console.log(`[Warmer] Job ${job_id}: cuenta ${account_id} → ${isSuccess ? 'OK' : 'ERROR'} (${error_code || ''})`);
+        // console.log(`[Warmer] Job ${job_id}: cuenta ${account_id} → ${isSuccess ? 'OK' : 'ERROR'} (${error_code || ''})`);
 
         socket.send(JSON.stringify({ type: 'warmer_result_ack', job_id, ok: true }));
 

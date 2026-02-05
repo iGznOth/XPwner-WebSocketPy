@@ -44,7 +44,7 @@ async function handleRequestScrapingJob(socket) {
 
         await connection.commit();
 
-        console.log(`[Scraping] Job ${job.id} (${job.tipo}) asignado a worker ${socket.workerId} | ${scraperAccounts.length} scraper accounts`);
+        // console.log(`[Scraping] Job ${job.id} (${job.tipo}) asignado a worker ${socket.workerId} | ${scraperAccounts.length} scraper accounts`);
 
         socket.send(JSON.stringify({
             type: 'scraping_job',
@@ -102,7 +102,7 @@ async function handleScrapingNext(socket, data) {
                 [job_id]
             );
             await connection.commit();
-            console.log(`[Scraping] Job ${job_id} ya alcanzó total (${job.procesados}/${job.total}), cerrando`);
+            // console.log(`[Scraping] Job ${job_id} ya alcanzó total (${job.procesados}/${job.total}), cerrando`);
             socket.send(JSON.stringify({
                 type: 'scraping_done',
                 job_id,
@@ -135,7 +135,7 @@ async function handleScrapingNext(socket, data) {
             if (filtros.account_id) {
                 whereParts.push('xa.id = ?');
                 whereParams.push(filtros.account_id);
-                console.log(`[Scraping] Job ${job_id}: filtro account_id=${filtros.account_id}`);
+                // console.log(`[Scraping] Job ${job_id}: filtro account_id=${filtros.account_id}`);
             }
             if (filtros.nombre) {
                 whereParts.push('xa.nombre = ?');
@@ -170,7 +170,7 @@ async function handleScrapingNext(socket, data) {
                 );
                 await connection.commit();
 
-                console.log(`[Scraping] Job ${job_id} completado: ${job.exitosos} ok, ${job.errores} errores`);
+                // console.log(`[Scraping] Job ${job_id} completado: ${job.exitosos} ok, ${job.errores} errores`);
                 socket.send(JSON.stringify({
                     type: 'scraping_done',
                     job_id,
@@ -220,7 +220,7 @@ async function handleScrapingNext(socket, data) {
             if (filtros.nick_id) {
                 whereParts.push('id = ?');
                 whereParams.push(filtros.nick_id);
-                console.log(`[Scraping] Job ${job_id}: filtro nick_id=${filtros.nick_id}`);
+                // console.log(`[Scraping] Job ${job_id}: filtro nick_id=${filtros.nick_id}`);
             }
             if (filtros.grupo) {
                 whereParts.push('grupo = ?');
@@ -247,7 +247,7 @@ async function handleScrapingNext(socket, data) {
                 );
                 await connection.commit();
 
-                console.log(`[Scraping] Job ${job_id} completado: ${job.exitosos} ok, ${job.errores} errores`);
+                // console.log(`[Scraping] Job ${job_id} completado: ${job.exitosos} ok, ${job.errores} errores`);
                 socket.send(JSON.stringify({
                     type: 'scraping_done',
                     job_id,
@@ -445,7 +445,7 @@ async function handleScraperAccountFail(socket, data) {
             [estado, (error_msg || '').substring(0, 500), scraper_id]
         );
 
-        console.log(`[Scraping] Scraper account ${scraper_id} marcada como ${estado}: ${error_msg}`);
+        // console.log(`[Scraping] Scraper account ${scraper_id} marcada como ${estado}: ${error_msg}`);
 
         socket.send(JSON.stringify({ type: 'scraper_fail_ack', scraper_id, ok: true }));
     } catch (err) {
@@ -477,7 +477,7 @@ async function handleScraperAccountSuccess(socket, data) {
  */
 async function handleScrapingNextBatch(socket, data) {
     const { job_id, batch_size = 20 } = data;
-    console.log(`[Scraping] handleScrapingNextBatch job_id=${job_id} batch_size=${batch_size}`);
+    // console.log(`[Scraping] handleScrapingNextBatch job_id=${job_id} batch_size=${batch_size}`);
     if (!job_id) {
         socket.send(JSON.stringify({ type: 'scraping_done', job_id: 0, error: 'missing job_id' }));
         return;
@@ -606,7 +606,7 @@ async function handleScrapingNextBatch(socket, data) {
 
         await connection.commit();
 
-        console.log(`[Scraping] Batch job ${job_id}: enviando ${targets.length} targets`);
+        // console.log(`[Scraping] Batch job ${job_id}: enviando ${targets.length} targets`);
         socket.send(JSON.stringify({
             type: 'scraping_batch',
             job_id,

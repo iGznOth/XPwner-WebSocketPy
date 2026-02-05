@@ -9,7 +9,7 @@ const { handleRequestAction, handleTaskAccepted, handleTaskRejected, handleNewAc
 const { handleStatus, handleProgress, handleTokenFail, handleTokenSuccess, handleTweetSnapshot } = require('./src/handlers/status');
 const { handleRequestWarmerJob, handleWarmerNext, handleWarmerResult } = require('./src/handlers/warmer');
 const { handleRequestScrapingJob, handleScrapingNext, handleScrapingNextBatch, handleScrapingResult, handleScrapingResultBatch, handleScraperAccountFail, handleScraperAccountSuccess } = require('./src/handlers/scraping');
-console.log(`[BOOT] Scraping handlers loaded: NextBatch=${typeof handleScrapingNextBatch}, ResultBatch=${typeof handleScrapingResultBatch}`);
+// boot check removed
 const { handleRequestToken, handleTokenReport, handleRequestTokenBatch, handleTokenReportBatch, cleanupStaleLocks, cleanupOldLogs } = require('./src/handlers/tokenManager');
 const { handleUpdate, handleLog } = require('./src/handlers/monitor');
 const { handleDisconnect } = require('./src/handlers/disconnect');
@@ -19,7 +19,7 @@ const wsPort = process.env.WS_PORT || '3005';
 const wss = new WebSocket.Server({ port: wsPort });
 
 wss.on('connection', (socket) => {
-    console.log('[Server] Cliente conectado.');
+    // client connected
 
     socket.isAlive = false;
     socket.userId = null;
@@ -30,10 +30,7 @@ wss.on('connection', (socket) => {
         try {
             const data = JSON.parse(message);
 
-            // Solo logear scraping batch para debug
-            if (data.type && data.type.includes('scraping')) {
-                console.log(`[Scraping-debug] MSG: ${data.type} | job_id=${data.job_id || '-'}`);
-            }
+            // logs removed
 
             // === AUTENTICACIÓN ===
             if (data.type === 'auth' && data.token) {
@@ -162,12 +159,10 @@ wss.on('connection', (socket) => {
             }
 
             else if (data.type === 'scraping_next_batch' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
-                console.log(`[Scraping-debug] ENTERING scraping_next_batch handler, fn exists: ${typeof handleScrapingNextBatch}`);
                 try {
                     await handleScrapingNextBatch(socket, data);
-                    console.log(`[Scraping-debug] scraping_next_batch handler DONE`);
                 } catch (err) {
-                    console.error('[Scraping-debug] ERROR en scraping_next_batch:', err.message, err.stack);
+                    console.error('[Server] Error en scraping_next_batch:', err.message);
                     socket.send(JSON.stringify({ type: 'scraping_done', job_id: data.job_id, error: err.message }));
                 }
             }
