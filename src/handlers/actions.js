@@ -1,6 +1,7 @@
-// src/handlers/actions.js — Gestión de acciones normales (request, accept, reject, push)
+// src/handlers/actions.js — Gestión de acciones normales (request, accept, reject, push, stop)
 // xWarmer jobs ahora se manejan en warmer.js
 const db = require('../db');
+const WebSocket = require('ws');
 const { getMonitors } = require('../state');
 
 /**
@@ -186,9 +187,68 @@ function handleNewAction(socket, data) {
     // console.log(`[Actions] new_action ${tipo} → notificados ${notified} workers de cuenta ${socket.userId}`);
 }
 
+/**
+ * Panel solicita detener una acción → buscar worker y enviarle stop
+ */
+async function handleStopAction(socket, data) {
+    const { action_id } = data;
+    if (!action_id || !socket.userId) return;
+
+    try {
+        // Verificar que la acción existe y pertenece a esta cuenta
+        const [actionRows] = await db.query(
+            `SELECT id, estado, worker_id, tipo FROM actions WHERE id = ? AND cuentas_id = ?`,
+            [action_id, socket.userId]
+        );
+
+        if (actionRows.length === 0) {
+            socket.send(JSON.stringify({ type: 'stop_action_result', action_id, success: false, message: 'Acción no encontrada' }));
+            return;
+        }
+
+        const action = actionRows[0];
+
+        // Si no está en proceso, solo actualizar DB
+        if (!['En Proceso', 'Pendiente de Aceptacion'].includes(action.estado)) {
+            if (['Completado', 'Detenida'].includes(action.estado)) {
+                socket.send(JSON.stringify({ type: 'stop_action_result', action_id, success: false, message: `Ya está ${action.estado}` }));
+                return;
+            }
+            // En Cola, Pausado, etc → marcar directamente
+            await db.query(`UPDATE actions SET estado = 'Detenida' WHERE id = ?`, [action_id]);
+            socket.send(JSON.stringify({ type: 'stop_action_result', action_id, success: true, message: 'Acción detenida' }));
+            return;
+        }
+
+        // Acción en proceso → enviar comando al worker
+        const userMonitors = getMonitors(socket.userId);
+        let sent = false;
+
+        for (const monitorSocket of userMonitors) {
+            if (monitorSocket.readyState === WebSocket.OPEN && monitorSocket.workerId === action.worker_id) {
+                monitorSocket.send(JSON.stringify({ type: 'stop_action', action_id: action_id }));
+                sent = true;
+                break;
+            }
+        }
+
+        if (!sent) {
+            // Worker no conectado — marcar directamente en DB
+            await db.query(`UPDATE actions SET estado = 'Detenida', worker_id = NULL WHERE id = ?`, [action_id]);
+            socket.send(JSON.stringify({ type: 'stop_action_result', action_id, success: true, message: 'Acción detenida (worker no conectado)' }));
+        } else {
+            socket.send(JSON.stringify({ type: 'stop_action_result', action_id, success: true, message: 'Señal de stop enviada al worker' }));
+        }
+    } catch (err) {
+        console.error(`[Actions] Error en stop_action ${action_id}:`, err.message);
+        socket.send(JSON.stringify({ type: 'stop_action_result', action_id, success: false, message: 'Error interno' }));
+    }
+}
+
 module.exports = {
     handleRequestAction,
     handleTaskAccepted,
     handleTaskRejected,
-    handleNewAction
+    handleNewAction,
+    handleStopAction
 };

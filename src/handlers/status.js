@@ -20,7 +20,7 @@ async function handleStatus(socket, data) {
                 commentToSave = actionRows[0].prev_comment;
             }
 
-            if (status === 'Completado' || status === 'Error') {
+            if (status === 'Completado' || status === 'Error' || status === 'Detenida') {
                 await db.query(`UPDATE actions SET estado = ?, comentario = ? WHERE id = ?`, [status, commentToSave, action_id]);
             } else if (status === 'En Cola') {
                 await db.query(`UPDATE actions SET estado = 'En Cola', worker_id = NULL, comentario = ? WHERE id = ?`, [commentToSave, action_id]);
@@ -29,8 +29,8 @@ async function handleStatus(socket, data) {
                 await db.query(`UPDATE actions SET estado = CASE WHEN estado NOT IN ('Completado', 'Error') THEN ? ELSE estado END, comentario = ? WHERE id = ?`, [status, commentToSave, action_id]);
             }
 
-            // Clean up media data when action is completed or errored
-            if (status === 'Completado' || status === 'Error') {
+            // Clean up media data when action is completed, errored or stopped
+            if (status === 'Completado' || status === 'Error' || status === 'Detenida') {
                 await db.query(`UPDATE actions SET media = NULL WHERE id = ? AND media IS NOT NULL`, [action_id]);
             }
 

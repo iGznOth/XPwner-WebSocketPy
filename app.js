@@ -5,7 +5,7 @@ const WebSocket = require('ws');
 
 // Handlers
 const { handleAuth } = require('./src/handlers/auth');
-const { handleRequestAction, handleTaskAccepted, handleTaskRejected, handleNewAction } = require('./src/handlers/actions');
+const { handleRequestAction, handleTaskAccepted, handleTaskRejected, handleNewAction, handleStopAction } = require('./src/handlers/actions');
 const { handleStatus, handleProgress, handleTokenFail, handleTokenSuccess, handleTweetSnapshot } = require('./src/handlers/status');
 const { handleRequestWarmerJob, handleWarmerNext, handleWarmerResult } = require('./src/handlers/warmer');
 const { handleRequestScrapingJob, handleScrapingNext, handleScrapingNextBatch, handleScrapingResult, handleScrapingResultBatch, handleScrapingJobComplete, handleScraperAccountFail, handleScraperAccountSuccess } = require('./src/handlers/scraping');
@@ -75,6 +75,16 @@ wss.on('connection', (socket) => {
             // === NUEVA ACCIÓN (desde panels — push instantáneo) ===
             else if (data.type === 'new_action' && socket.isAlive && socket.userId && socket.clientType === 'panel') {
                 handleNewAction(socket, data);
+            }
+
+            // === DETENER ACCIÓN (desde panels — stop action) ===
+            else if (data.type === 'stop_action' && socket.isAlive && socket.userId && socket.clientType === 'panel') {
+                try {
+                    await handleStopAction(socket, data);
+                } catch (err) {
+                    console.error('[Server] Error en stop_action:', err.message);
+                    socket.send(JSON.stringify({ type: 'stop_action_result', action_id: data.action_id, success: false, message: 'Error interno' }));
+                }
             }
 
             // === STATUS Y PROGRESO (desde monitors) ===
