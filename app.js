@@ -18,13 +18,30 @@ const { handleDisconnect } = require('./src/handlers/disconnect');
 const wsPort = process.env.WS_PORT || '3005';
 const wss = new WebSocket.Server({ port: wsPort });
 
+// ── Ping/Pong heartbeat — detectar workers muertos cada 30s ──
+const HEARTBEAT_INTERVAL = 30000;
+setInterval(() => {
+    wss.clients.forEach((socket) => {
+        if (socket._isAliveWs === false) {
+            // No respondió al ping anterior → muerto
+            console.log(`[Heartbeat] Worker ${socket.workerId || 'unknown'} no respondió ping, cerrando`);
+            return socket.terminate();
+        }
+        socket._isAliveWs = false;
+        socket.ping();
+    });
+}, HEARTBEAT_INTERVAL);
+
 wss.on('connection', (socket) => {
     // client connected
 
     socket.isAlive = false;
+    socket._isAliveWs = true; // Para heartbeat ping/pong
     socket.userId = null;
     socket.clientType = "monitor";
     socket.workerId = null;
+
+    socket.on('pong', () => { socket._isAliveWs = true; });
 
     socket.on('message', async (message) => {
         try {

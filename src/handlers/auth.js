@@ -17,11 +17,19 @@ async function handleAuth(socket, data) {
 
             await db.query('UPDATE cuentas SET estado_monitor = ? WHERE id = ?', ['Conectado', socket.userId]);
 
-            if (!data.reconnect) {
-                await db.query("UPDATE actions SET estado = ? WHERE estado= ? AND cuentas_id = ?", ["En Cola", "Desconeccion", socket.userId]);
-                // Devolver warmer jobs en proceso de este worker a cola
-                await db.query("UPDATE xwarmer_actions SET estado = 'En Cola', worker_id = NULL WHERE estado = 'En Proceso' AND worker_id = ?", [socket.workerId]);
+            // Resetear acciones huérfanas (de workers anteriores que murieron)
+            // En conexión nueva: resetear "Desconeccion" + cualquier "En Proceso"/"Pendiente de Aceptacion" de esta cuenta
+            const [stale] = await db.query(
+                `UPDATE actions SET estado = 'En Cola', worker_id = NULL 
+                 WHERE cuentas_id = ? AND estado IN ('Desconeccion', 'En Proceso', 'Pendiente de Aceptacion')`,
+                [socket.userId]
+            );
+            if (stale.affectedRows > 0) {
+                console.log(`[Auth] Reset ${stale.affectedRows} acciones huérfanas para cuenta ${socket.userId}`);
             }
+            // Devolver warmer/scraping jobs huérfanos
+            await db.query("UPDATE xwarmer_actions SET estado = 'En Cola', worker_id = NULL WHERE estado = 'En Proceso'");
+            await db.query(`UPDATE scraping_jobs SET estado = 'En Cola', worker_id = NULL, procesados = 0, exitosos = 0, errores = 0 WHERE estado = 'En Proceso'`);
 
         } else if (socket.clientType === 'panel') {
             addPanel(socket.userId, socket);

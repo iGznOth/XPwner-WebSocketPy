@@ -1,5 +1,13 @@
 # CHANGELOG — XPwner WebSocket
 
+## v2.6.3 — 2026-02-05
+
+### Fix acciones huérfanas al reconectar worker
+- **Ping/pong heartbeat** cada 30s para detectar workers muertos (antes no se detectaban)
+- **Auth handler**: al conectar, resetea TODAS las acciones "En Proceso" y "Pendiente de Aceptacion" de la cuenta a "En Cola"
+- También resetea warmer y scraping jobs huérfanos
+- Log: `[Auth] Reset N acciones huérfanas para cuenta X`
+
 ## v2.6.2 — 2026-02-05
 
 ### APM Fix — Eliminar override de xSpammer
