@@ -473,35 +473,26 @@ async function handleScraperAccountSuccess(socket, data) {
 }
 
 /**
- * Worker pide batch de targets — reduce queries de N a 1
+ * Worker pide batch de targets — sin FOR UPDATE para evitar lock contention
+ * La paginación por _last_id garantiza no duplicados
  */
 async function handleScrapingNextBatch(socket, data) {
     const { job_id, batch_size = 20 } = data;
-    // console.log(`[Scraping] handleScrapingNextBatch job_id=${job_id} batch_size=${batch_size}`);
     if (!job_id) {
         socket.send(JSON.stringify({ type: 'scraping_done', job_id: 0, error: 'missing job_id' }));
         return;
     }
 
-    const limit = Math.min(Math.max(batch_size, 1), 50); // clamp 1-50
-    let connection;
-    try {
-        connection = await db.getConnection();
-    } catch (connErr) {
-        console.error(`[Scraping] Error obteniendo conexión:`, connErr.message);
-        socket.send(JSON.stringify({ type: 'scraping_done', job_id, error: 'db connection error' }));
-        return;
-    }
-    await connection.beginTransaction();
+    const limit = Math.min(Math.max(batch_size, 1), 50);
 
     try {
-        const [jobRows] = await connection.query(
-            `SELECT * FROM scraping_jobs WHERE id = ? FOR UPDATE`,
+        // Leer job sin lock — solo necesitamos filtros y estado
+        const [jobRows] = await db.query(
+            `SELECT * FROM scraping_jobs WHERE id = ?`,
             [job_id]
         );
 
         if (jobRows.length === 0) {
-            await connection.commit();
             socket.send(JSON.stringify({ type: 'scraping_done', job_id, error: 'job not found' }));
             return;
         }
@@ -509,11 +500,10 @@ async function handleScrapingNextBatch(socket, data) {
         const job = jobRows[0];
 
         if (job.procesados >= job.total && job.total > 0) {
-            await connection.query(
+            await db.query(
                 `UPDATE scraping_jobs SET estado = 'Completado', completed_at = COALESCE(completed_at, NOW()) WHERE id = ? AND estado != 'Completado'`,
                 [job_id]
             );
-            await connection.commit();
             socket.send(JSON.stringify({ type: 'scraping_done', job_id, total: job.procesados, exitosos: job.exitosos, errores: job.errores }));
             return;
         }
@@ -536,7 +526,7 @@ async function handleScrapingNextBatch(socket, data) {
             if (filtros.estado) { whereParts.push('xa.estado = ?'); whereParams.push(filtros.estado); }
             if (filtros.estado_salud) { whereParts.push('xa.estado_salud = ?'); whereParams.push(filtros.estado_salud); }
 
-            const [rows] = await connection.query(
+            const [rows] = await db.query(
                 `SELECT xa.id, xa.nick, xa.auth_token, xa.ct0, xa.twitter_user_id,
                         xa.fails_consecutivos, xa.deck_id,
                         COALESCE(p.proxy_request, NULL) as deck_proxy
@@ -558,7 +548,7 @@ async function handleScrapingNextBatch(socket, data) {
             }));
 
             if (rows.length > 0) {
-                await connection.query(
+                await db.query(
                     `UPDATE scraping_jobs SET filtros = JSON_SET(COALESCE(filtros, '{}'), '$._last_id', ?) WHERE id = ?`,
                     [rows[rows.length - 1].id, job_id]
                 );
@@ -572,7 +562,7 @@ async function handleScrapingNextBatch(socket, data) {
             if (filtros.grupo) { whereParts.push('grupo = ?'); whereParams.push(filtros.grupo); }
             if (filtros.estado) { whereParts.push('estado = ?'); whereParams.push(filtros.estado); }
 
-            const [rows] = await connection.query(
+            const [rows] = await db.query(
                 `SELECT id, nick, userid, profile_img, location
                  FROM xwarmer_nicks
                  WHERE ${whereParts.join(' AND ')}
@@ -587,7 +577,7 @@ async function handleScrapingNextBatch(socket, data) {
             }));
 
             if (rows.length > 0) {
-                await connection.query(
+                await db.query(
                     `UPDATE scraping_jobs SET filtros = JSON_SET(COALESCE(filtros, '{}'), '$._last_id', ?) WHERE id = ?`,
                     [rows[rows.length - 1].id, job_id]
                 );
@@ -595,18 +585,14 @@ async function handleScrapingNextBatch(socket, data) {
         }
 
         if (targets.length === 0) {
-            await connection.query(
+            await db.query(
                 `UPDATE scraping_jobs SET estado = 'Completado', completed_at = NOW(), total = procesados WHERE id = ?`,
                 [job_id]
             );
-            await connection.commit();
             socket.send(JSON.stringify({ type: 'scraping_done', job_id, total: job.procesados, exitosos: job.exitosos, errores: job.errores }));
             return;
         }
 
-        await connection.commit();
-
-        // console.log(`[Scraping] Batch job ${job_id}: enviando ${targets.length} targets`);
         socket.send(JSON.stringify({
             type: 'scraping_batch',
             job_id,
@@ -615,11 +601,8 @@ async function handleScrapingNextBatch(socket, data) {
         }));
 
     } catch (err) {
-        try { await connection.rollback(); } catch (e) { /* ignore */ }
-        console.error(`[Scraping] Error en scraping_next_batch para job ${job_id}:`, err.message, err.stack);
+        console.error(`[Scraping] Error en scraping_next_batch para job ${job_id}:`, err.message);
         try { socket.send(JSON.stringify({ type: 'scraping_done', job_id, error: err.message })); } catch (e) { /* ignore */ }
-    } finally {
-        if (connection) connection.release();
     }
 }
 
