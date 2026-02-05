@@ -19,7 +19,8 @@ async function handleAuth(socket, data) {
 
             if (!data.reconnect) {
                 await db.query("UPDATE actions SET estado = ? WHERE estado= ? AND cuentas_id = ?", ["En Cola", "Desconeccion", socket.userId]);
-                await db.query("UPDATE xwarmer_actions SET estado = ? WHERE estado= ? AND cuentas_id = ?", ["En Cola", "Desconeccion", socket.userId]);
+                // Devolver warmer jobs en proceso de este worker a cola
+                await db.query("UPDATE xwarmer_actions SET estado = 'En Cola', worker_id = NULL WHERE estado = 'En Proceso' AND worker_id = ?", [socket.workerId]);
             }
 
         } else if (socket.clientType === 'panel') {

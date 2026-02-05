@@ -7,6 +7,7 @@ const WebSocket = require('ws');
 const { handleAuth } = require('./src/handlers/auth');
 const { handleRequestAction, handleTaskAccepted, handleTaskRejected, handleNewAction } = require('./src/handlers/actions');
 const { handleStatus, handleProgress, handleTokenFail, handleTokenSuccess, handleTweetSnapshot } = require('./src/handlers/status');
+const { handleRequestWarmerJob, handleWarmerNext, handleWarmerResult } = require('./src/handlers/warmer');
 const { handleRequestToken, handleTokenReport, handleRequestTokenBatch, handleTokenReportBatch, cleanupStaleLocks, cleanupOldLogs } = require('./src/handlers/tokenManager');
 const { handleUpdate, handleLog } = require('./src/handlers/monitor');
 const { handleDisconnect } = require('./src/handlers/disconnect');
@@ -108,6 +109,34 @@ wss.on('connection', (socket) => {
 
             else if (data.type === 'token_report_batch' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
                 await handleTokenReportBatch(socket, data);
+            }
+
+            // === XWARMER JOBS (desde monitors) ===
+            else if (data.type === 'request_warmer_job' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
+                try {
+                    await handleRequestWarmerJob(socket);
+                } catch (err) {
+                    console.error('[Server] Error en request_warmer_job:', err.message);
+                    socket.send(JSON.stringify({ type: 'no_warmer_job', reason: 'server_error' }));
+                }
+            }
+
+            else if (data.type === 'warmer_next' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
+                try {
+                    await handleWarmerNext(socket, data);
+                } catch (err) {
+                    console.error('[Server] Error en warmer_next:', err.message);
+                    socket.send(JSON.stringify({ type: 'warmer_done', job_id: data.job_id, error: err.message }));
+                }
+            }
+
+            else if (data.type === 'warmer_result' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
+                try {
+                    await handleWarmerResult(socket, data);
+                } catch (err) {
+                    console.error('[Server] Error en warmer_result:', err.message);
+                    socket.send(JSON.stringify({ type: 'warmer_result_ack', job_id: data.job_id, ok: false }));
+                }
             }
 
             // === MÉTRICAS Y LOGS (desde monitors) ===

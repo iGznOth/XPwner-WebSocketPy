@@ -25,8 +25,8 @@ async function handleDisconnect(socket) {
             [socket.userId, socket.workerId]
         );
         await db.query(
-            'UPDATE xwarmer_actions SET estado = "En Cola", worker_id = NULL WHERE cuentas_id = ? AND worker_id = ? AND estado IN ("Pendiente de Aceptacion", "En Proceso")',
-            [socket.userId, socket.workerId]
+            'UPDATE xwarmer_actions SET estado = "En Cola", worker_id = NULL WHERE worker_id = ? AND estado IN ("En Proceso")',
+            [socket.workerId]
         );
 
         // Notificar a paneles

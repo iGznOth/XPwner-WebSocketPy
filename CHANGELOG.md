@@ -1,5 +1,24 @@
 # CHANGELOG — XPwner WebSocket
 
+## v2.5.0 — 2026-02-05
+
+### xWarmer — Handler job-based
+
+#### 🆕 `src/handlers/warmer.js`
+- `handleRequestWarmerJob`: Worker solicita job disponible de `xwarmer_actions`
+- `handleWarmerNext`: Asigna siguiente cuenta del deck + nick/tweet random del grupo
+- `handleWarmerResult`: Registra resultado en `xwarmer_action_log`, actualiza contadores y salud de cuenta
+- Notificación Telegram al completar job
+
+#### 🔄 Cambios en `app.js`
+- Registrados 3 nuevos message types: `request_warmer_job`, `warmer_next`, `warmer_result`
+
+#### 🧹 Limpieza legacy
+- `actions.js`: Eliminada toda lógica `isWarmer` (ya no usa tabla vieja)
+- `status.js`: Eliminada `updateWarmerAccountHealth` (ahora en warmer.js)
+- `auth.js`: Cleanup de warmer adaptado a nueva estructura de jobs
+- `disconnect.js`: Cleanup de warmer adaptado a nueva estructura de jobs
+
 ## v2.4.0 — 2026-02-03
 
 ### Tweet Snapshot Storage
