@@ -1,5 +1,10 @@
 # CHANGELOG — XPwner WebSocket
 
+## v2.6.1 — 2026-02-05
+
+### APM Fix
+- `handleRequestAction`: leer `a.apm` (tabla actions) en vez de `p.apm` (preconfigs) para respetar el APM guardado por acción
+
 ## v2.6.0 — 2026-02-05
 
 ### Scraping Handlers

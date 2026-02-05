@@ -44,7 +44,7 @@ async function handleRequestAction(socket, data) {
                 COALESCE(p.proxy_request, NULL) AS proxy_request,
                 COALESCE(p.tokens, NULL) AS tokens,
                 COALESCE(p.chatid, NULL) AS chatid,
-                COALESCE(p.apm, 60) AS apm
+                COALESCE(a.apm, 60) AS apm
             FROM actions a 
             LEFT JOIN preconfigs p ON a.preconfig_id = p.id 
             WHERE a.estado = 'En Cola' 
