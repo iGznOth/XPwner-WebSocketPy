@@ -1,5 +1,17 @@
 # CHANGELOG — XPwner WebSocket
 
+## v2.6.0 — 2026-02-05
+
+### Scraping Handlers
+- `src/handlers/scraping.js`: handlers completos para scraping jobs
+  - `handleRequestScrapingJob`: asigna job + envía todas las scraper accounts al worker
+  - `handleScrapingNext`: envía siguiente target (xchecker account o xwarmer nick)
+  - `handleScrapingResult`: procesa resultado y actualiza DB (xchecker_accounts / xwarmer_nicks)
+  - `handleScraperAccountFail`: marca scraper account como fallida (auth/proxy/rate_limit)
+  - `handleScraperAccountSuccess`: resetea fails y actualiza last_use
+- `app.js`: registrados 5 nuevos handlers de scraping
+- `disconnect.js`: libera scraping jobs al desconectar worker
+
 ## v2.5.1 — 2026-02-05
 
 ### xWarmer — Fix total_cuentas
