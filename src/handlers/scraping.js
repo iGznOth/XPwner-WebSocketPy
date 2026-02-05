@@ -336,13 +336,14 @@ async function handleScrapingResult(socket, data) {
                     await connection.query(
                         `UPDATE xchecker_accounts SET 
                          nick = ?, twitter_user_id = ?, estado = 'active', estado_salud = 'activo',
-                         followers_count = ?, following_count = ?, profile_img = ?, 
+                         followers_count = ?, following_count = ?,
+                         profile_img = CASE WHEN ? != '' THEN ? ELSE profile_img END,
                          location = ?, bio_descrip = ?, bio_link = ?,
                          fails_consecutivos = 0, ultimo_error = NULL, updated_at = NOW()
                          WHERE id = ?`,
                         [p.screen_name || r.nick, p.twitter_user_id, p.followers_count || 0, 
-                         p.following_count || 0, p.profile_img || '', p.location || '', 
-                         p.bio_descrip || '', p.bio_link || '', target_id]
+                         p.following_count || 0, p.profile_img || '', p.profile_img || '',
+                         p.location || '', p.bio_descrip || '', p.bio_link || '', target_id]
                     );
                 } else {
                     // Cuenta con problemas
@@ -649,13 +650,14 @@ async function handleScrapingResultBatch(socket, data) {
                         await connection.query(
                             `UPDATE xchecker_accounts SET
                              nick = ?, twitter_user_id = ?, estado = 'active', estado_salud = 'activo',
-                             followers_count = ?, following_count = ?, profile_img = ?,
+                             followers_count = ?, following_count = ?,
+                             profile_img = CASE WHEN ? != '' THEN ? ELSE profile_img END,
                              location = ?, bio_descrip = ?, bio_link = ?,
                              fails_consecutivos = 0, ultimo_error = NULL, updated_at = NOW()
                              WHERE id = ?`,
                             [p.screen_name || result.nick, p.twitter_user_id, p.followers_count || 0,
-                             p.following_count || 0, p.profile_img || '', p.location || '',
-                             p.bio_descrip || '', p.bio_link || '', target_id]
+                             p.following_count || 0, p.profile_img || '', p.profile_img || '',
+                             p.location || '', p.bio_descrip || '', p.bio_link || '', target_id]
                         );
                     } else {
                         const nuevoEstado = ['suspendido', 'locked', 'deslogueado'].includes(salud) ? 'inactive' : null;
