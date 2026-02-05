@@ -478,6 +478,7 @@ async function handleScraperAccountSuccess(socket, data) {
  */
 async function handleScrapingNextBatch(socket, data) {
     const { job_id, batch_size = 20 } = data;
+    console.log(`[Batch] → scraping_next_batch recibido: job_id=${job_id} batch_size=${batch_size}`);
     if (!job_id) {
         socket.send(JSON.stringify({ type: 'scraping_done', job_id: 0, error: 'missing job_id' }));
         return;
@@ -487,17 +488,21 @@ async function handleScrapingNextBatch(socket, data) {
 
     try {
         // Leer job sin lock — solo necesitamos filtros y estado
+        console.log(`[Batch] Querying job ${job_id}...`);
         const [jobRows] = await db.query(
             `SELECT * FROM scraping_jobs WHERE id = ?`,
             [job_id]
         );
+        console.log(`[Batch] Job query done, rows=${jobRows.length}`);
 
         if (jobRows.length === 0) {
+            console.log(`[Batch] Job ${job_id} not found`);
             socket.send(JSON.stringify({ type: 'scraping_done', job_id, error: 'job not found' }));
             return;
         }
 
         const job = jobRows[0];
+        console.log(`[Batch] Job ${job_id}: tipo=${job.tipo} procesados=${job.procesados}/${job.total} estado=${job.estado}`);
 
         if (job.procesados >= job.total && job.total > 0) {
             await db.query(
@@ -514,6 +519,7 @@ async function handleScrapingNextBatch(socket, data) {
             else if (Buffer.isBuffer(job.filtros)) filtros = JSON.parse(job.filtros.toString('utf8'));
             else if (job.filtros && typeof job.filtros === 'object') filtros = job.filtros;
         } catch (e) { /* ignore */ }
+        console.log(`[Batch] Filtros: _last_id=${filtros._last_id || 0}`);
 
         let targets = [];
 
@@ -584,24 +590,29 @@ async function handleScrapingNextBatch(socket, data) {
             }
         }
 
+        console.log(`[Batch] Targets encontrados: ${targets.length}`);
+
         if (targets.length === 0) {
             await db.query(
                 `UPDATE scraping_jobs SET estado = 'Completado', completed_at = NOW(), total = procesados WHERE id = ?`,
                 [job_id]
             );
+            console.log(`[Batch] Job ${job_id} completado, enviando scraping_done`);
             socket.send(JSON.stringify({ type: 'scraping_done', job_id, total: job.procesados, exitosos: job.exitosos, errores: job.errores }));
             return;
         }
 
+        console.log(`[Batch] Enviando scraping_batch con ${targets.length} targets`);
         socket.send(JSON.stringify({
             type: 'scraping_batch',
             job_id,
             targets,
             progress: { procesados: job.procesados, total: job.total, exitosos: job.exitosos, errores: job.errores }
         }));
+        console.log(`[Batch] ✅ Enviado OK`);
 
     } catch (err) {
-        console.error(`[Scraping] Error en scraping_next_batch para job ${job_id}:`, err.message);
+        console.error(`[Batch] ❌ Error en scraping_next_batch para job ${job_id}:`, err.message, err.stack);
         try { socket.send(JSON.stringify({ type: 'scraping_done', job_id, error: err.message })); } catch (e) { /* ignore */ }
     }
 }

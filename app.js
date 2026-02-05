@@ -30,7 +30,10 @@ wss.on('connection', (socket) => {
         try {
             const data = JSON.parse(message);
 
-            // logs removed
+            // Log solo scraping batch para debug
+            if (data.type === 'scraping_next_batch') {
+                console.log(`[Batch] RAW msg recibido: type=${data.type} isAlive=${socket.isAlive} userId=${socket.userId} clientType=${socket.clientType}`);
+            }
 
             // === AUTENTICACIÓN ===
             if (data.type === 'auth' && data.token) {
@@ -159,10 +162,11 @@ wss.on('connection', (socket) => {
             }
 
             else if (data.type === 'scraping_next_batch' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
+                console.log(`[Batch] app.js: scraping_next_batch de userId=${socket.userId} isAlive=${socket.isAlive} clientType=${socket.clientType}`);
                 try {
                     await handleScrapingNextBatch(socket, data);
                 } catch (err) {
-                    console.error('[Server] Error en scraping_next_batch:', err.message);
+                    console.error('[Batch] app.js: EXCEPCION en scraping_next_batch:', err.message, err.stack);
                     socket.send(JSON.stringify({ type: 'scraping_done', job_id: data.job_id, error: err.message }));
                 }
             }
