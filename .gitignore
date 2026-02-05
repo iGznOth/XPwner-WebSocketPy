@@ -1,0 +1,50 @@
+# Node.js
+node_modules
+.env
+.env*
+!.env.example
+.vscode
+*.log/
+npm-debug.log
+yarn-error.log
+.pnpm-debug.log
+yarn-debug.log
+
+# Entorno y secretos (¡nunca subir!)
+.vscode/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Builds y distribuciones
+dist/
+build/
+.next/
+out/
+coverage/
+.nyc_output
+
+# Logs y temporales
+*.log
+logs/
+*.log.*
+.DS_Store
+Thumbs.db
+
+# Editor y OS temporales
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Archivos de lock (opcional, algunos prefieren no subirlos)
+package-lock.json    # quitalo si usás npm y querés lock
+yarn.lock            # quitalo si usás yarn
+pnpm-lock.yaml       # quitalo si usás pnpm
+
+# Cachés comunes
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
