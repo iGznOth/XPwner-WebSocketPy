@@ -104,19 +104,20 @@ async function handleWarmerNext(socket, data) {
         );
 
         if (accounts.length === 0) {
-            // No quedan cuentas → job completo
+            // No quedan cuentas → job completo — ajustar total al real ejecutado
+            const realTotal = job.cuentas_ejecutadas;
             await connection.query(
-                `UPDATE xwarmer_actions SET estado = 'Completado', completed_at = NOW() WHERE id = ?`,
+                `UPDATE xwarmer_actions SET estado = 'Completado', completed_at = NOW(), total_cuentas = cuentas_ejecutadas WHERE id = ?`,
                 [job_id]
             );
             await connection.commit();
 
-            console.log(`[Warmer] Job ${job_id} completado: ${job.cuentas_exitosas} ok, ${job.cuentas_error} errores`);
+            console.log(`[Warmer] Job ${job_id} completado: ${job.cuentas_exitosas} ok, ${job.cuentas_error} errores (real: ${realTotal})`);
 
             socket.send(JSON.stringify({
                 type: 'warmer_done',
                 job_id,
-                total: job.total_cuentas,
+                total: realTotal,
                 exitosas: job.cuentas_exitosas,
                 errores: job.cuentas_error
             }));
