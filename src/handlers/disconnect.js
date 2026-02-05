@@ -7,7 +7,7 @@ const { removeMonitor, removePanel, broadcastToPanels } = require('../state');
  * Maneja desconexión de un socket
  */
 async function handleDisconnect(socket) {
-    console.log('[Server] Cliente desconectado.');
+    // console.log('[Server] Cliente desconectado.');
 
     if (socket.clientType === 'monitor' && socket.userId) {
         const wasLast = removeMonitor(socket.userId, socket);
@@ -40,7 +40,7 @@ async function handleDisconnect(socket) {
 
     } else if (socket.clientType === 'panel' && socket.userId) {
         removePanel(socket.userId, socket);
-        console.log('[Server] Panel desconectado.');
+        // console.log('[Server] Panel desconectado.');
     }
 }
 

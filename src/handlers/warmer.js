@@ -22,7 +22,7 @@ async function handleRequestWarmerJob(socket) {
 
         if (jobs.length === 0) {
             await connection.commit();
-            console.log('[Warmer] No hay jobs en cola, enviando no_warmer_job');
+            // console.log('[Warmer] No hay jobs en cola, enviando no_warmer_job');
             socket.send(JSON.stringify({ type: 'no_warmer_job' }));
             return;
         }
@@ -156,7 +156,7 @@ async function handleWarmerNext(socket, data) {
 
         if (nicks.length === 0) {
             await connection.commit();
-            console.warn(`[Warmer] Job ${job_id}: no hay nicks activos en grupo ${job.grupo_nicks}`);
+            // console.warn(`[Warmer] Job ${job_id}: no hay nicks activos en grupo ${job.grupo_nicks}`);
             socket.send(JSON.stringify({ type: 'warmer_done', job_id, error: 'no nicks available' }));
             return;
         }

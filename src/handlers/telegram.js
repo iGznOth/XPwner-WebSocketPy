@@ -27,7 +27,7 @@ async function sendCompletionNotification(actionId) {
         }
 
         if (!chatid || chatid.toString().trim() === '') {
-            console.log(`[Telegram] Acción ${actionId} completada pero sin chatid → no se envía notificación`);
+            // console.log(`[Telegram] Acción ${actionId} completada pero sin chatid → no se envía notificación`);
             return;
         }
 
@@ -63,7 +63,7 @@ async function sendCompletionNotification(actionId) {
 
         const result = await res.json();
         if (result.ok) {
-            console.log(`[Telegram] Notificación enviada - Acción ${actionId} → Chat ${chatid}`);
+            // console.log(`[Telegram] Notificación enviada - Acción ${actionId} → Chat ${chatid}`);
         } else {
             console.error(`[Telegram] Error API Telegram:`, result.description || result);
         }

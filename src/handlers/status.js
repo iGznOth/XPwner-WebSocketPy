@@ -24,7 +24,7 @@ async function handleStatus(socket, data) {
                 await db.query(`UPDATE actions SET estado = ?, comentario = ? WHERE id = ?`, [status, commentToSave, action_id]);
             } else if (status === 'En Cola') {
                 await db.query(`UPDATE actions SET estado = 'En Cola', worker_id = NULL, comentario = ? WHERE id = ?`, [commentToSave, action_id]);
-                console.log(`[Status] Acción ${action_id} devuelta a 'En Cola' por worker ${socket.workerId}`);
+                // console.log(`[Status] Acción ${action_id} devuelta a 'En Cola' por worker ${socket.workerId}`);
             } else {
                 await db.query(`UPDATE actions SET estado = CASE WHEN estado NOT IN ('Completado', 'Error') THEN ? ELSE estado END, comentario = ? WHERE id = ?`, [status, commentToSave, action_id]);
             }
@@ -34,14 +34,14 @@ async function handleStatus(socket, data) {
                 await db.query(`UPDATE actions SET media = NULL WHERE id = ? AND media IS NOT NULL`, [action_id]);
             }
 
-            console.log(`[Status] Acción ${action_id} actualizada: ${status}`);
+            // console.log(`[Status] Acción ${action_id} actualizada: ${status}`);
 
             // Notificación Telegram solo al completar
             if (status === 'Completado') {
                 sendCompletionNotification(action_id);
             }
         } else {
-            console.warn(`[Status] Worker ${socket.workerId} intentó actualizar acción ${action_id} no asignada.`);
+            // console.warn(`[Status] Worker ${socket.workerId} intentó actualizar acción ${action_id} no asignada.`);
         }
     }
 
@@ -62,7 +62,7 @@ async function handleProgress(socket, data) {
             'UPDATE actions SET estado = CASE WHEN estado NOT IN (\'Completado\', \'Error\') THEN \'En Proceso\' ELSE estado END, acciones_realizadas = acciones_realizadas + ? WHERE id = ?',
             [cantidad, action_id]
         );
-        console.log(`[Status] Progreso: Acción ${action_id} +${cantidad} por worker ${socket.workerId}`);
+        // console.log(`[Status] Progreso: Acción ${action_id} +${cantidad} por worker ${socket.workerId}`);
     }
 }
 
@@ -119,7 +119,7 @@ async function handleTweetSnapshot(socket, data) {
         const [actionRows] = await db.query('SELECT worker_id FROM actions WHERE id = ?', [action_id]);
         if (actionRows.length > 0 && actionRows[0].worker_id === socket.workerId) {
             await db.query('UPDATE actions SET tweet_snapshot = ? WHERE id = ?', [JSON.stringify(tweetData), action_id]);
-            console.log(`[Snapshot] Tweet snapshot guardado para acción ${action_id}`);
+            // console.log(`[Snapshot] Tweet snapshot guardado para acción ${action_id}`);
         }
     } catch (err) {
         console.error(`[Snapshot] Error guardando snapshot para acción ${action_id}:`, err.message);

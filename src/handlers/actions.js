@@ -85,7 +85,7 @@ async function handleRequestAction(socket, data) {
                          ORDER BY ultimo_uso ASC`,
                         [action.preconfig_id]
                     );
-                    console.log(`[Actions] View acción ${action.id}: ${deckTokens.length} tokens para deck ${action.preconfig_id}`);
+                    // console.log(`[Actions] View acción ${action.id}: ${deckTokens.length} tokens para deck ${action.preconfig_id}`);
                     if (deckTokens.length > 0) {
                         dpayload.action.deck_tokens = deckTokens;
                         dpayload.action.use_token_manager = false;
@@ -96,7 +96,7 @@ async function handleRequestAction(socket, data) {
                 }
             }
 
-            console.log(`[Actions] Acción ${action.id} enviada a worker ${socket.workerId} de cuenta ${socket.userId}`);
+            // console.log(`[Actions] Acción ${action.id} enviada a worker ${socket.workerId} de cuenta ${socket.userId}`);
             socket.send(JSON.stringify(dpayload));
         } else {
             await connection.commit();
@@ -119,9 +119,9 @@ async function handleTaskAccepted(socket, data) {
     const [actionRows] = await db.query('SELECT worker_id FROM actions WHERE id = ? AND estado = ?', [action_id, 'Pendiente de Aceptacion']);
     if (actionRows.length > 0 && actionRows[0].worker_id === socket.workerId) {
         await db.query('UPDATE actions SET estado = ? WHERE id = ?', ['En Proceso', action_id]);
-        console.log(`[Actions] Acción ${action_id} aceptada por worker ${socket.workerId}`);
+        // console.log(`[Actions] Acción ${action_id} aceptada por worker ${socket.workerId}`);
     } else {
-        console.warn(`[Actions] Worker ${socket.workerId} intentó aceptar acción ${action_id} no asignada.`);
+        // console.warn(`[Actions] Worker ${socket.workerId} intentó aceptar acción ${action_id} no asignada.`);
     }
 }
 
@@ -134,9 +134,9 @@ async function handleTaskRejected(socket, data) {
     const [actionRows] = await db.query('SELECT worker_id FROM actions WHERE id = ? AND estado = ?', [action_id, 'Pendiente de Aceptacion']);
     if (actionRows.length > 0 && actionRows[0].worker_id === socket.workerId) {
         await db.query('UPDATE actions SET estado = ?, worker_id = NULL WHERE id = ?', ['En Cola', action_id]);
-        console.log(`[Actions] Acción ${action_id} rechazada por worker ${socket.workerId}. Devuelta a 'En Cola'`);
+        // console.log(`[Actions] Acción ${action_id} rechazada por worker ${socket.workerId}. Devuelta a 'En Cola'`);
     } else {
-        console.warn(`[Actions] Worker ${socket.workerId} intentó rechazar acción ${action_id} no asignada.`);
+        // console.warn(`[Actions] Worker ${socket.workerId} intentó rechazar acción ${action_id} no asignada.`);
     }
 }
 
@@ -149,7 +149,7 @@ function handleNewAction(socket, data) {
 
     const userMonitors = getMonitors(socket.userId);
     if (userMonitors.size === 0) {
-        console.log(`[Actions] new_action ${tipo} para cuenta ${socket.userId} pero no hay workers conectados`);
+        // console.log(`[Actions] new_action ${tipo} para cuenta ${socket.userId} pero no hay workers conectados`);
         return;
     }
 
@@ -164,7 +164,7 @@ function handleNewAction(socket, data) {
         }
     }
 
-    console.log(`[Actions] new_action ${tipo} → notificados ${notified} workers de cuenta ${socket.userId}`);
+    // console.log(`[Actions] new_action ${tipo} → notificados ${notified} workers de cuenta ${socket.userId}`);
 }
 
 module.exports = {

@@ -98,7 +98,7 @@ async function handleRequestToken(socket, data) {
                     unlocked: unlockedRows[0].total,
                     already_used_this_tweet: usedCount
                 };
-                console.log(`[TokenManager] No tokens para deck ${deck_id} (${action_type}): total=${diagnostics.total_in_deck} active=${diagnostics.active} auth=${diagnostics.with_auth} healthy=${diagnostics.healthy} unlocked=${diagnostics.unlocked} used=${diagnostics.already_used_this_tweet}`);
+                // console.log(`[TokenManager] No tokens para deck ${deck_id} (${action_type}): total=${diagnostics.total_in_deck} active=${diagnostics.active} auth=${diagnostics.with_auth} healthy=${diagnostics.healthy} unlocked=${diagnostics.unlocked} used=${diagnostics.already_used_this_tweet}`);
             } catch (diagErr) {
                 console.error('[TokenManager] Error en diagnóstico:', diagErr.message);
             }
@@ -126,7 +126,7 @@ async function handleRequestToken(socket, data) {
 
         await connection.commit();
 
-        console.log(`[TokenManager] Token ${token.id} (@${token.nick}) asignado a worker ${socket.workerId} para ${action_type}`);
+        // console.log(`[TokenManager] Token ${token.id} (@${token.nick}) asignado a worker ${socket.workerId} para ${action_type}`);
 
         socket.send(JSON.stringify({
             type: 'token_assigned',
@@ -250,11 +250,11 @@ async function handleTokenReport(socket, data) {
                 setParams
             );
 
-            console.log(`[TokenManager] Cookies actualizadas para token ${token_id}`);
+            // console.log(`[TokenManager] Cookies actualizadas para token ${token_id}`);
         }
 
         await connection.commit();
-        console.log(`[TokenManager] Report: token ${token_id} → ${success ? 'success' : 'fail'} (${action_type})`);
+        // console.log(`[TokenManager] Report: token ${token_id} → ${success ? 'success' : 'fail'} (${action_type})`);
 
     } catch (err) {
         await connection.rollback();
@@ -275,7 +275,7 @@ async function cleanupStaleLocks() {
              WHERE locked = 1 AND locked_at < NOW() - INTERVAL 10 MINUTE`
         );
         if (result.affectedRows > 0) {
-            console.log(`[TokenManager] Cleanup: ${result.affectedRows} tokens desbloqueados por timeout`);
+            // console.log(`[TokenManager] Cleanup: ${result.affectedRows} tokens desbloqueados por timeout`);
         }
     } catch (err) {
         console.error('[TokenManager] Error en cleanup:', err.message);
@@ -291,7 +291,7 @@ async function cleanupOldLogs() {
             `DELETE FROM token_actions_log WHERE created_at < NOW() - INTERVAL 60 DAY`
         );
         if (result.affectedRows > 0) {
-            console.log(`[TokenManager] Cleanup: ${result.affectedRows} logs eliminados (>60 días)`);
+            // console.log(`[TokenManager] Cleanup: ${result.affectedRows} logs eliminados (>60 días)`);
         }
     } catch (err) {
         console.error('[TokenManager] Error en cleanup logs:', err.message);
@@ -371,7 +371,7 @@ async function handleRequestTokenBatch(socket, data) {
                     usedCount = usedRows[0].total;
                 }
                 diagnostics = { total_in_deck: totalRows[0].total, healthy_unlocked: healthyRows[0].total, already_used: usedCount };
-                console.log(`[TokenManager] No tokens batch para deck ${deck_id} (${action_type}): total=${diagnostics.total_in_deck} healthy_unlocked=${diagnostics.healthy_unlocked} used=${diagnostics.already_used}`);
+                // console.log(`[TokenManager] No tokens batch para deck ${deck_id} (${action_type}): total=${diagnostics.total_in_deck} healthy_unlocked=${diagnostics.healthy_unlocked} used=${diagnostics.already_used}`);
             } catch (e) {}
 
             await connection.commit();
@@ -397,7 +397,7 @@ async function handleRequestTokenBatch(socket, data) {
 
         await connection.commit();
 
-        console.log(`[TokenManager] Batch: ${tokens.length} tokens asignados a worker ${socket.workerId} para ${action_type}`);
+        // console.log(`[TokenManager] Batch: ${tokens.length} tokens asignados a worker ${socket.workerId} para ${action_type}`);
 
         socket.send(JSON.stringify({
             type: 'token_batch_assigned',
@@ -484,7 +484,7 @@ async function handleTokenReportBatch(socket, data) {
         }
 
         await connection.commit();
-        console.log(`[TokenManager] Batch report: ${reports.length} tokens procesados (worker ${socket.workerId})`);
+        // console.log(`[TokenManager] Batch report: ${reports.length} tokens procesados (worker ${socket.workerId})`);
 
     } catch (err) {
         await connection.rollback();
