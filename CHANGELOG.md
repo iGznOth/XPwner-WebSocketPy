@@ -1,5 +1,11 @@
 # CHANGELOG — XPwner WebSocket
 
+## v2.5.1 — 2026-02-05
+
+### xWarmer — Fix total_cuentas
+- Al completar job, `total_cuentas` se ajusta al número real ejecutado (`cuentas_ejecutadas`)
+- El query de `handleWarmerNext` ya filtraba por `estado = 'active'`, ahora el total refleja eso
+
 ## v2.5.0 — 2026-02-05
 
 ### xWarmer — Handler job-based
