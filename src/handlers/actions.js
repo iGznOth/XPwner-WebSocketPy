@@ -63,9 +63,9 @@ async function handleRequestAction(socket, data) {
                     a.media,
                     COALESCE(p.proxy, NULL) AS proxy,
                     COALESCE(p.proxy_request, NULL) AS proxy_request,
-                    COALESCE(p.proxy_impulso, NULL) AS proxy_impulso,
                     COALESCE(p.tokens, NULL) AS tokens,
-                    COALESCE(p.chatid, NULL) AS chatid
+                    COALESCE(p.chatid, NULL) AS chatid,
+                    COALESCE(p.apm, 60) AS apm
                 FROM actions a 
                 LEFT JOIN preconfigs p ON a.preconfig_id = p.id 
                 WHERE a.estado = 'En Cola' 
@@ -94,8 +94,8 @@ async function handleRequestAction(socket, data) {
                     cantidad: action.cantidad,
                     proxy: action.proxy,
                     proxy_request: action.proxy_request || null,
-                    proxy_impulso: action.proxy_impulso || null,
                     tokens: action.tokens,
+                    apm: action.apm || 60,
                     comentarios: action.comentario,
                     util: action.util,
                     chatid: action.chatid,
