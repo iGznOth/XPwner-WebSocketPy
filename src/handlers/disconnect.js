@@ -29,7 +29,9 @@ async function handleDisconnect(socket) {
             [socket.workerId]
         );
         await db.query(
-            'UPDATE scraping_jobs SET estado = "En Cola", worker_id = NULL WHERE worker_id = ? AND estado IN ("En Proceso")',
+            `UPDATE scraping_jobs SET estado = "En Cola", worker_id = NULL, procesados = 0, exitosos = 0, errores = 0,
+             filtros = JSON_REMOVE(COALESCE(filtros, '{}'), '$._last_id')
+             WHERE worker_id = ? AND estado IN ("En Proceso")`,
             [socket.workerId]
         );
 
