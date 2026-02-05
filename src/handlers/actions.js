@@ -5,12 +5,25 @@ const { getMonitors } = require('../state');
 
 /**
  * Worker solicita una acción (pull model)
+ * data.modulo: si es 'xSpammer', solo devuelve acciones xSpammer (con APM del módulo)
+ *              si no, excluye xSpammer del pool normal
  */
 async function handleRequestAction(socket, data) {
     const connection = await db.getConnection();
     await connection.beginTransaction();
 
     try {
+        // Filtro por módulo: xSpammer separado de acciones normales
+        let moduloFilter;
+        let queryParams;
+        if (data.modulo === 'xSpammer') {
+            moduloFilter = "AND a.modulo = 'xSpammer'";
+            queryParams = [data.tipo, socket.userId];
+        } else {
+            moduloFilter = "AND (a.modulo IS NULL OR a.modulo != 'xSpammer')";
+            queryParams = [data.tipo, socket.userId];
+        }
+
         const [actions] = await connection.query(
             `SELECT 
                 a.id, 
@@ -26,6 +39,7 @@ async function handleRequestAction(socket, data) {
                 a.request,
                 a.modulo,
                 a.media,
+                a.xspammer_module_id,
                 COALESCE(p.proxy, NULL) AS proxy,
                 COALESCE(p.proxy_request, NULL) AS proxy_request,
                 COALESCE(p.tokens, NULL) AS tokens,
@@ -37,9 +51,10 @@ async function handleRequestAction(socket, data) {
               AND a.tipo = ? 
               AND a.cuentas_id = ? 
               AND a.fecha < NOW()
+              ${moduloFilter}
             ORDER BY a.id ASC 
             LIMIT 1 FOR UPDATE`,
-            [data.tipo, socket.userId]
+            queryParams
         );
 
         if (actions.length > 0) {
@@ -51,6 +66,28 @@ async function handleRequestAction(socket, data) {
 
             await connection.commit();
 
+            // Para xSpammer: obtener APM del módulo en vez del deck
+            let actionApm = action.apm || 60;
+            if (action.modulo === 'xSpammer' && action.xspammer_module_id) {
+                try {
+                    const [modRows] = await db.query(
+                        'SELECT apm_likes, apm_retweets, apm_comments, apm_views FROM xspammer_modules WHERE id = ?',
+                        [action.xspammer_module_id]
+                    );
+                    if (modRows.length > 0) {
+                        const m = modRows[0];
+                        switch (action.tipo) {
+                            case 'favoritos': actionApm = m.apm_likes || 10; break;
+                            case 'retweet': actionApm = m.apm_retweets || 3; break;
+                            case 'comentario': actionApm = m.apm_comments || 1; break;
+                            case 'view': actionApm = m.apm_views || 400; break;
+                        }
+                    }
+                } catch (e) {
+                    // Fallback al APM del deck
+                }
+            }
+
             let dpayload = {
                 type: 'action',
                 action: {
@@ -61,7 +98,7 @@ async function handleRequestAction(socket, data) {
                     proxy: action.proxy,
                     proxy_request: action.proxy_request || null,
                     tokens: action.tokens,
-                    apm: action.apm || 60,
+                    apm: actionApm,
                     comentarios: action.comentario,
                     util: action.util,
                     chatid: action.chatid,
