@@ -8,6 +8,7 @@ const { handleAuth } = require('./src/handlers/auth');
 const { handleRequestAction, handleTaskAccepted, handleTaskRejected, handleNewAction } = require('./src/handlers/actions');
 const { handleStatus, handleProgress, handleTokenFail, handleTokenSuccess, handleTweetSnapshot } = require('./src/handlers/status');
 const { handleRequestWarmerJob, handleWarmerNext, handleWarmerResult } = require('./src/handlers/warmer');
+const { handleRequestScrapingJob, handleScrapingNext, handleScrapingResult, handleScraperAccountFail, handleScraperAccountSuccess } = require('./src/handlers/scraping');
 const { handleRequestToken, handleTokenReport, handleRequestTokenBatch, handleTokenReportBatch, cleanupStaleLocks, cleanupOldLogs } = require('./src/handlers/tokenManager');
 const { handleUpdate, handleLog } = require('./src/handlers/monitor');
 const { handleDisconnect } = require('./src/handlers/disconnect');
@@ -137,6 +138,42 @@ wss.on('connection', (socket) => {
                     console.error('[Server] Error en warmer_result:', err.message);
                     socket.send(JSON.stringify({ type: 'warmer_result_ack', job_id: data.job_id, ok: false }));
                 }
+            }
+
+            // === SCRAPING JOBS (desde monitors) ===
+            else if (data.type === 'request_scraping_job' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
+                try {
+                    await handleRequestScrapingJob(socket);
+                } catch (err) {
+                    console.error('[Server] Error en request_scraping_job:', err.message);
+                    socket.send(JSON.stringify({ type: 'no_scraping_job', reason: 'server_error' }));
+                }
+            }
+
+            else if (data.type === 'scraping_next' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
+                try {
+                    await handleScrapingNext(socket, data);
+                } catch (err) {
+                    console.error('[Server] Error en scraping_next:', err.message);
+                    socket.send(JSON.stringify({ type: 'scraping_done', job_id: data.job_id, error: err.message }));
+                }
+            }
+
+            else if (data.type === 'scraping_result' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
+                try {
+                    await handleScrapingResult(socket, data);
+                } catch (err) {
+                    console.error('[Server] Error en scraping_result:', err.message);
+                    socket.send(JSON.stringify({ type: 'scraping_result_ack', job_id: data.job_id, ok: false }));
+                }
+            }
+
+            else if (data.type === 'scraper_account_fail' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
+                await handleScraperAccountFail(socket, data);
+            }
+
+            else if (data.type === 'scraper_account_success' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
+                await handleScraperAccountSuccess(socket, data);
             }
 
             // === MÉTRICAS Y LOGS (desde monitors) ===

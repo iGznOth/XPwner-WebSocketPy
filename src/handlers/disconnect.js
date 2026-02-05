@@ -28,6 +28,10 @@ async function handleDisconnect(socket) {
             'UPDATE xwarmer_actions SET estado = "En Cola", worker_id = NULL WHERE worker_id = ? AND estado IN ("En Proceso")',
             [socket.workerId]
         );
+        await db.query(
+            'UPDATE scraping_jobs SET estado = "En Cola", worker_id = NULL WHERE worker_id = ? AND estado IN ("En Proceso")',
+            [socket.workerId]
+        );
 
         // Notificar a paneles
         broadcastToPanels(socket.userId, { type: 'disconnect' });
