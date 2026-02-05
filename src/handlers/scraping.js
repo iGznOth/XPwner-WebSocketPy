@@ -98,22 +98,36 @@ async function handleScrapingNext(socket, data) {
 
         if (job.tipo === 'xchecker_health') {
             // Buscar siguiente cuenta no procesada en este job
+            let whereParts = ['xa.id > ?'];
+            let whereParams = [filtros._last_id || 0];
+
+            if (filtros.account_id) {
+                whereParts.push('xa.id = ?');
+                whereParams.push(filtros.account_id);
+            }
+            if (filtros.nombre) {
+                whereParts.push('xa.nombre = ?');
+                whereParams.push(filtros.nombre);
+            }
+            if (filtros.estado) {
+                whereParts.push('xa.estado = ?');
+                whereParams.push(filtros.estado);
+            }
+            if (filtros.estado_salud) {
+                whereParts.push('xa.estado_salud = ?');
+                whereParams.push(filtros.estado_salud);
+            }
+
             const [accounts] = await connection.query(
                 `SELECT xa.id, xa.nick, xa.auth_token, xa.ct0, xa.twitter_user_id, 
                         xa.fails_consecutivos, xa.deck_id,
                         COALESCE(p.proxy_request, NULL) as deck_proxy
                  FROM xchecker_accounts xa
                  LEFT JOIN preconfigs p ON xa.deck_id = p.id
-                 WHERE xa.id > ?
-                   ${filtros.deck_id ? 'AND xa.deck_id = ?' : ''}
-                   ${filtros.estado ? 'AND xa.estado = ?' : ''}
+                 WHERE ${whereParts.join(' AND ')}
                  ORDER BY xa.id ASC
                  LIMIT 1`,
-                [
-                    job.procesados > 0 ? (filtros._last_id || 0) : 0,
-                    ...(filtros.deck_id ? [filtros.deck_id] : []),
-                    ...(filtros.estado ? [filtros.estado] : [])
-                ].filter(v => v !== undefined)
+                whereParams
             );
 
             if (accounts.length === 0) {
@@ -168,19 +182,29 @@ async function handleScrapingNext(socket, data) {
 
         } else if (job.tipo === 'xwarmer_nicks') {
             // Buscar siguiente nick no procesado
+            let whereParts = ['id > ?'];
+            let whereParams = [filtros._last_id || 0];
+
+            if (filtros.nick_id) {
+                whereParts.push('id = ?');
+                whereParams.push(filtros.nick_id);
+            }
+            if (filtros.grupo) {
+                whereParts.push('grupo = ?');
+                whereParams.push(filtros.grupo);
+            }
+            if (filtros.estado) {
+                whereParts.push('estado = ?');
+                whereParams.push(filtros.estado);
+            }
+
             const [nicks] = await connection.query(
                 `SELECT id, nick, userid, profile_img, location
                  FROM xwarmer_nicks
-                 WHERE id > ?
-                   ${filtros.grupo ? 'AND grupo = ?' : ''}
-                   ${filtros.estado ? 'AND estado = ?' : ''}
+                 WHERE ${whereParts.join(' AND ')}
                  ORDER BY id ASC
                  LIMIT 1`,
-                [
-                    filtros._last_id || 0,
-                    ...(filtros.grupo ? [filtros.grupo] : []),
-                    ...(filtros.estado ? [filtros.estado] : [])
-                ].filter(v => v !== undefined)
+                whereParams
             );
 
             if (nicks.length === 0) {
