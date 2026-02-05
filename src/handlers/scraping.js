@@ -94,7 +94,38 @@ async function handleScrapingNext(socket, data) {
         }
 
         const job = jobRows[0];
-        const filtros = typeof job.filtros === 'string' ? JSON.parse(job.filtros) : (job.filtros || {});
+
+        // Safety: si ya se procesó todo, marcar completado
+        if (job.procesados >= job.total && job.total > 0) {
+            await connection.query(
+                `UPDATE scraping_jobs SET estado = 'Completado', completed_at = COALESCE(completed_at, NOW()) WHERE id = ? AND estado != 'Completado'`,
+                [job_id]
+            );
+            await connection.commit();
+            console.log(`[Scraping] Job ${job_id} ya alcanzó total (${job.procesados}/${job.total}), cerrando`);
+            socket.send(JSON.stringify({
+                type: 'scraping_done',
+                job_id,
+                total: job.procesados,
+                exitosos: job.exitosos,
+                errores: job.errores
+            }));
+            return;
+        }
+
+        // Parsear filtros (puede venir como string, object, o Buffer)
+        let filtros = {};
+        try {
+            if (typeof job.filtros === 'string') {
+                filtros = JSON.parse(job.filtros);
+            } else if (Buffer.isBuffer(job.filtros)) {
+                filtros = JSON.parse(job.filtros.toString('utf8'));
+            } else if (job.filtros && typeof job.filtros === 'object') {
+                filtros = job.filtros;
+            }
+        } catch (e) {
+            console.error(`[Scraping] Error parseando filtros job ${job_id}:`, e.message);
+        }
 
         if (job.tipo === 'xchecker_health') {
             // Buscar siguiente cuenta no procesada en este job
@@ -104,6 +135,7 @@ async function handleScrapingNext(socket, data) {
             if (filtros.account_id) {
                 whereParts.push('xa.id = ?');
                 whereParams.push(filtros.account_id);
+                console.log(`[Scraping] Job ${job_id}: filtro account_id=${filtros.account_id}`);
             }
             if (filtros.nombre) {
                 whereParts.push('xa.nombre = ?');
@@ -188,6 +220,7 @@ async function handleScrapingNext(socket, data) {
             if (filtros.nick_id) {
                 whereParts.push('id = ?');
                 whereParams.push(filtros.nick_id);
+                console.log(`[Scraping] Job ${job_id}: filtro nick_id=${filtros.nick_id}`);
             }
             if (filtros.grupo) {
                 whereParts.push('grupo = ?');
