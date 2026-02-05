@@ -22,6 +22,7 @@ async function handleRequestWarmerJob(socket) {
 
         if (jobs.length === 0) {
             await connection.commit();
+            console.log('[Warmer] No hay jobs en cola, enviando no_warmer_job');
             socket.send(JSON.stringify({ type: 'no_warmer_job' }));
             return;
         }
@@ -52,7 +53,7 @@ async function handleRequestWarmerJob(socket) {
         }));
     } catch (err) {
         await connection.rollback();
-        console.error('[Warmer] Error asignando job:', err.message);
+        console.error('[Warmer] Error asignando job:', err.message, err.stack);
         socket.send(JSON.stringify({ type: 'no_warmer_job', reason: 'db_error' }));
     } finally {
         connection.release();

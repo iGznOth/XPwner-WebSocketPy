@@ -477,13 +477,21 @@ async function handleScraperAccountSuccess(socket, data) {
  */
 async function handleScrapingNextBatch(socket, data) {
     const { job_id, batch_size = 20 } = data;
+    console.log(`[Scraping] handleScrapingNextBatch job_id=${job_id} batch_size=${batch_size}`);
     if (!job_id) {
         socket.send(JSON.stringify({ type: 'scraping_done', job_id: 0, error: 'missing job_id' }));
         return;
     }
 
     const limit = Math.min(Math.max(batch_size, 1), 50); // clamp 1-50
-    const connection = await db.getConnection();
+    let connection;
+    try {
+        connection = await db.getConnection();
+    } catch (connErr) {
+        console.error(`[Scraping] Error obteniendo conexión:`, connErr.message);
+        socket.send(JSON.stringify({ type: 'scraping_done', job_id, error: 'db connection error' }));
+        return;
+    }
     await connection.beginTransaction();
 
     try {
@@ -598,6 +606,7 @@ async function handleScrapingNextBatch(socket, data) {
 
         await connection.commit();
 
+        console.log(`[Scraping] Batch job ${job_id}: enviando ${targets.length} targets`);
         socket.send(JSON.stringify({
             type: 'scraping_batch',
             job_id,
@@ -606,11 +615,11 @@ async function handleScrapingNextBatch(socket, data) {
         }));
 
     } catch (err) {
-        await connection.rollback();
-        console.error(`[Scraping] Error en scraping_next_batch para job ${job_id}:`, err.message);
-        socket.send(JSON.stringify({ type: 'scraping_done', job_id, error: err.message }));
+        try { await connection.rollback(); } catch (e) { /* ignore */ }
+        console.error(`[Scraping] Error en scraping_next_batch para job ${job_id}:`, err.message, err.stack);
+        try { socket.send(JSON.stringify({ type: 'scraping_done', job_id, error: err.message })); } catch (e) { /* ignore */ }
     } finally {
-        connection.release();
+        if (connection) connection.release();
     }
 }
 
