@@ -1,5 +1,13 @@
 # CHANGELOG — XPwner WebSocket
 
+## v2.6.2 — 2026-02-05
+
+### APM Fix — Eliminar override de xSpammer
+- **Bug**: el WebSocket sobreescribía `a.apm` con el rate del módulo SIN dividir por period
+  - Ej: comentarios 1 cada 10 min → `a.apm=0.1` correcto, pero override usaba `apm_comments=1`
+- **Fix**: usar `a.apm` directamente (ya calculado como rate/period en el INSERT)
+- `parseFloat()` para manejar DECIMAL devuelto como string por mysql2
+
 ## v2.6.1 — 2026-02-05
 
 ### APM Fix

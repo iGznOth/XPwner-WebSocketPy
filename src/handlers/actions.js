@@ -66,27 +66,9 @@ async function handleRequestAction(socket, data) {
 
             await connection.commit();
 
-            // Para xSpammer: obtener APM del módulo en vez del deck
-            let actionApm = action.apm || 60;
-            if (action.modulo === 'xSpammer' && action.xspammer_module_id) {
-                try {
-                    const [modRows] = await db.query(
-                        'SELECT apm_likes, apm_retweets, apm_comments, apm_views FROM xspammer_modules WHERE id = ?',
-                        [action.xspammer_module_id]
-                    );
-                    if (modRows.length > 0) {
-                        const m = modRows[0];
-                        switch (action.tipo) {
-                            case 'favoritos': actionApm = m.apm_likes || 10; break;
-                            case 'retweet': actionApm = m.apm_retweets || 3; break;
-                            case 'comentario': actionApm = m.apm_comments || 1; break;
-                            case 'view': actionApm = m.apm_views || 400; break;
-                        }
-                    }
-                } catch (e) {
-                    // Fallback al APM del deck
-                }
-            }
+            // APM ya viene calculado correctamente en a.apm (rate/period)
+            // Parseamos a float por si MySQL devuelve DECIMAL como string
+            let actionApm = parseFloat(action.apm) || 60;
 
             let dpayload = {
                 type: 'action',
