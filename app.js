@@ -8,7 +8,7 @@ const { handleAuth } = require('./src/handlers/auth');
 const { handleRequestAction, handleTaskAccepted, handleTaskRejected, handleNewAction } = require('./src/handlers/actions');
 const { handleStatus, handleProgress, handleTokenFail, handleTokenSuccess, handleTweetSnapshot } = require('./src/handlers/status');
 const { handleRequestWarmerJob, handleWarmerNext, handleWarmerResult } = require('./src/handlers/warmer');
-const { handleRequestScrapingJob, handleScrapingNext, handleScrapingResult, handleScraperAccountFail, handleScraperAccountSuccess } = require('./src/handlers/scraping');
+const { handleRequestScrapingJob, handleScrapingNext, handleScrapingNextBatch, handleScrapingResult, handleScrapingResultBatch, handleScraperAccountFail, handleScraperAccountSuccess } = require('./src/handlers/scraping');
 const { handleRequestToken, handleTokenReport, handleRequestTokenBatch, handleTokenReportBatch, cleanupStaleLocks, cleanupOldLogs } = require('./src/handlers/tokenManager');
 const { handleUpdate, handleLog } = require('./src/handlers/monitor');
 const { handleDisconnect } = require('./src/handlers/disconnect');
@@ -159,12 +159,30 @@ wss.on('connection', (socket) => {
                 }
             }
 
+            else if (data.type === 'scraping_next_batch' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
+                try {
+                    await handleScrapingNextBatch(socket, data);
+                } catch (err) {
+                    console.error('[Server] Error en scraping_next_batch:', err.message);
+                    socket.send(JSON.stringify({ type: 'scraping_done', job_id: data.job_id, error: err.message }));
+                }
+            }
+
             else if (data.type === 'scraping_result' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
                 try {
                     await handleScrapingResult(socket, data);
                 } catch (err) {
                     console.error('[Server] Error en scraping_result:', err.message);
                     socket.send(JSON.stringify({ type: 'scraping_result_ack', job_id: data.job_id, ok: false }));
+                }
+            }
+
+            else if (data.type === 'scraping_result_batch' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
+                try {
+                    await handleScrapingResultBatch(socket, data);
+                } catch (err) {
+                    console.error('[Server] Error en scraping_result_batch:', err.message);
+                    socket.send(JSON.stringify({ type: 'scraping_result_batch_ack', job_id: data.job_id, ok: false }));
                 }
             }
 

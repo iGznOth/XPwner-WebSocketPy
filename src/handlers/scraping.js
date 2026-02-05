@@ -472,10 +472,264 @@ async function handleScraperAccountSuccess(socket, data) {
     }
 }
 
+/**
+ * Worker pide batch de targets — reduce queries de N a 1
+ */
+async function handleScrapingNextBatch(socket, data) {
+    const { job_id, batch_size = 20 } = data;
+    if (!job_id) {
+        socket.send(JSON.stringify({ type: 'scraping_done', job_id: 0, error: 'missing job_id' }));
+        return;
+    }
+
+    const limit = Math.min(Math.max(batch_size, 1), 50); // clamp 1-50
+    const connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    try {
+        const [jobRows] = await connection.query(
+            `SELECT * FROM scraping_jobs WHERE id = ? FOR UPDATE`,
+            [job_id]
+        );
+
+        if (jobRows.length === 0) {
+            await connection.commit();
+            socket.send(JSON.stringify({ type: 'scraping_done', job_id, error: 'job not found' }));
+            return;
+        }
+
+        const job = jobRows[0];
+
+        if (job.procesados >= job.total && job.total > 0) {
+            await connection.query(
+                `UPDATE scraping_jobs SET estado = 'Completado', completed_at = COALESCE(completed_at, NOW()) WHERE id = ? AND estado != 'Completado'`,
+                [job_id]
+            );
+            await connection.commit();
+            socket.send(JSON.stringify({ type: 'scraping_done', job_id, total: job.procesados, exitosos: job.exitosos, errores: job.errores }));
+            return;
+        }
+
+        let filtros = {};
+        try {
+            if (typeof job.filtros === 'string') filtros = JSON.parse(job.filtros);
+            else if (Buffer.isBuffer(job.filtros)) filtros = JSON.parse(job.filtros.toString('utf8'));
+            else if (job.filtros && typeof job.filtros === 'object') filtros = job.filtros;
+        } catch (e) { /* ignore */ }
+
+        let targets = [];
+
+        if (job.tipo === 'xchecker_health') {
+            let whereParts = ['xa.id > ?'];
+            let whereParams = [filtros._last_id || 0];
+
+            if (filtros.account_id) { whereParts.push('xa.id = ?'); whereParams.push(filtros.account_id); }
+            if (filtros.nombre) { whereParts.push('xa.nombre = ?'); whereParams.push(filtros.nombre); }
+            if (filtros.estado) { whereParts.push('xa.estado = ?'); whereParams.push(filtros.estado); }
+            if (filtros.estado_salud) { whereParts.push('xa.estado_salud = ?'); whereParams.push(filtros.estado_salud); }
+
+            const [rows] = await connection.query(
+                `SELECT xa.id, xa.nick, xa.auth_token, xa.ct0, xa.twitter_user_id,
+                        xa.fails_consecutivos, xa.deck_id,
+                        COALESCE(p.proxy_request, NULL) as deck_proxy
+                 FROM xchecker_accounts xa
+                 LEFT JOIN preconfigs p ON xa.deck_id = p.id
+                 WHERE ${whereParts.join(' AND ')}
+                 ORDER BY xa.id ASC
+                 LIMIT ?`,
+                [...whereParams, limit]
+            );
+
+            targets = rows.map(a => ({
+                target_type: 'xchecker_health',
+                target: {
+                    id: a.id, nick: a.nick, auth_token: a.auth_token, ct0: a.ct0,
+                    twitter_user_id: a.twitter_user_id, fails_consecutivos: a.fails_consecutivos,
+                    proxy: a.deck_proxy || null
+                }
+            }));
+
+            if (rows.length > 0) {
+                await connection.query(
+                    `UPDATE scraping_jobs SET filtros = JSON_SET(COALESCE(filtros, '{}'), '$._last_id', ?) WHERE id = ?`,
+                    [rows[rows.length - 1].id, job_id]
+                );
+            }
+
+        } else if (job.tipo === 'xwarmer_nicks') {
+            let whereParts = ['id > ?'];
+            let whereParams = [filtros._last_id || 0];
+
+            if (filtros.nick_id) { whereParts.push('id = ?'); whereParams.push(filtros.nick_id); }
+            if (filtros.grupo) { whereParts.push('grupo = ?'); whereParams.push(filtros.grupo); }
+            if (filtros.estado) { whereParts.push('estado = ?'); whereParams.push(filtros.estado); }
+
+            const [rows] = await connection.query(
+                `SELECT id, nick, userid, profile_img, location
+                 FROM xwarmer_nicks
+                 WHERE ${whereParts.join(' AND ')}
+                 ORDER BY id ASC
+                 LIMIT ?`,
+                [...whereParams, limit]
+            );
+
+            targets = rows.map(n => ({
+                target_type: 'xwarmer_nicks',
+                target: { id: n.id, nick: n.nick, userid: n.userid }
+            }));
+
+            if (rows.length > 0) {
+                await connection.query(
+                    `UPDATE scraping_jobs SET filtros = JSON_SET(COALESCE(filtros, '{}'), '$._last_id', ?) WHERE id = ?`,
+                    [rows[rows.length - 1].id, job_id]
+                );
+            }
+        }
+
+        if (targets.length === 0) {
+            await connection.query(
+                `UPDATE scraping_jobs SET estado = 'Completado', completed_at = NOW(), total = procesados WHERE id = ?`,
+                [job_id]
+            );
+            await connection.commit();
+            socket.send(JSON.stringify({ type: 'scraping_done', job_id, total: job.procesados, exitosos: job.exitosos, errores: job.errores }));
+            return;
+        }
+
+        await connection.commit();
+
+        socket.send(JSON.stringify({
+            type: 'scraping_batch',
+            job_id,
+            targets,
+            progress: { procesados: job.procesados, total: job.total, exitosos: job.exitosos, errores: job.errores }
+        }));
+
+    } catch (err) {
+        await connection.rollback();
+        console.error(`[Scraping] Error en scraping_next_batch para job ${job_id}:`, err.message);
+        socket.send(JSON.stringify({ type: 'scraping_done', job_id, error: err.message }));
+    } finally {
+        connection.release();
+    }
+}
+
+/**
+ * Worker reporta batch de resultados — 1 transacción para N resultados
+ */
+async function handleScrapingResultBatch(socket, data) {
+    const { job_id, results } = data;
+    if (!job_id || !results || !Array.isArray(results)) {
+        socket.send(JSON.stringify({ type: 'scraping_result_batch_ack', job_id, ok: false, error: 'missing params' }));
+        return;
+    }
+
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        let okCount = 0;
+        let errCount = 0;
+
+        for (const r of results) {
+            const { target_id, target_type, status, result, error_msg } = r;
+            if (!target_id) continue;
+
+            const isSuccess = status === 'ok';
+            if (isSuccess) okCount++; else errCount++;
+
+            if (target_type === 'xchecker_health') {
+                if (isSuccess && result) {
+                    const salud = result.estado_salud || 'activo';
+                    if (salud === 'activo' && result.profile) {
+                        const p = result.profile;
+                        await connection.query(
+                            `UPDATE xchecker_accounts SET
+                             nick = ?, twitter_user_id = ?, estado = 'active', estado_salud = 'activo',
+                             followers_count = ?, following_count = ?, profile_img = ?,
+                             location = ?, bio_descrip = ?, bio_link = ?,
+                             fails_consecutivos = 0, ultimo_error = NULL, updated_at = NOW()
+                             WHERE id = ?`,
+                            [p.screen_name || result.nick, p.twitter_user_id, p.followers_count || 0,
+                             p.following_count || 0, p.profile_img || '', p.location || '',
+                             p.bio_descrip || '', p.bio_link || '', target_id]
+                        );
+                    } else {
+                        const nuevoEstado = ['suspendido', 'locked', 'deslogueado'].includes(salud) ? 'inactive' : null;
+                        if (nuevoEstado) {
+                            await connection.query(
+                                `UPDATE xchecker_accounts SET estado = ?, estado_salud = ?, ultimo_error = ?,
+                                 fails_consecutivos = fails_consecutivos + 1, updated_at = NOW() WHERE id = ?`,
+                                [nuevoEstado, salud, result.error_msg || 'unknown', target_id]
+                            );
+                        } else {
+                            await connection.query(
+                                `UPDATE xchecker_accounts SET estado_salud = ?, ultimo_error = ?,
+                                 fails_consecutivos = fails_consecutivos + 1, updated_at = NOW() WHERE id = ?`,
+                                [salud, result.error_msg || 'unknown', target_id]
+                            );
+                        }
+                    }
+                } else {
+                    await connection.query(
+                        `UPDATE xchecker_accounts SET ultimo_error = ?, fails_consecutivos = fails_consecutivos + 1, updated_at = NOW() WHERE id = ?`,
+                        [error_msg || 'scraping error', target_id]
+                    );
+                }
+            } else if (target_type === 'xwarmer_nicks') {
+                if (isSuccess && result) {
+                    if (result.tweets && result.tweets.length > 0) {
+                        await connection.query(
+                            `UPDATE xwarmer_nicks SET estado = 'active', userid = ?, profile_img = ?, location = ?,
+                             bio_descrip = ?, bio_link = ?, tweets = ?, pineado = ?,
+                             comentario = '', updated_at = NOW(), UserByScreenName = NOW() WHERE id = ?`,
+                            [result.userid || null, result.profile_img || '', result.location || '',
+                             result.bio_descrip || '', result.bio_link || '',
+                             JSON.stringify(result.tweets), result.pineado ? 1 : 0, target_id]
+                        );
+                    } else {
+                        await connection.query(
+                            `UPDATE xwarmer_nicks SET estado = 'inactive', userid = ?, profile_img = ?, location = ?,
+                             bio_descrip = ?, bio_link = ?, tweets = '[]',
+                             comentario = ?, updated_at = NOW(), UserByScreenName = NOW() WHERE id = ?`,
+                            [result.userid || null, result.profile_img || '', result.location || '',
+                             result.bio_descrip || '', result.bio_link || '',
+                             result.comentario || 'sin tweets válidos', target_id]
+                        );
+                    }
+                } else {
+                    await connection.query(
+                        `UPDATE xwarmer_nicks SET estado = 'inactive', comentario = ?, tweets = '[]', updated_at = NOW() WHERE id = ?`,
+                        [error_msg || 'scraping error', target_id]
+                    );
+                }
+            }
+        }
+
+        // Actualizar contadores del job de una sola vez
+        await connection.query(
+            `UPDATE scraping_jobs SET procesados = procesados + ?, exitosos = exitosos + ?, errores = errores + ? WHERE id = ?`,
+            [okCount + errCount, okCount, errCount, job_id]
+        );
+
+        await connection.commit();
+        socket.send(JSON.stringify({ type: 'scraping_result_batch_ack', job_id, ok: true, processed: results.length }));
+
+    } catch (err) {
+        await connection.rollback();
+        console.error(`[Scraping] Error en scraping_result_batch:`, err.message);
+        socket.send(JSON.stringify({ type: 'scraping_result_batch_ack', job_id, ok: false, error: err.message }));
+    } finally {
+        connection.release();
+    }
+}
+
 module.exports = {
     handleRequestScrapingJob,
     handleScrapingNext,
+    handleScrapingNextBatch,
     handleScrapingResult,
+    handleScrapingResultBatch,
     handleScraperAccountFail,
     handleScraperAccountSuccess
 };
