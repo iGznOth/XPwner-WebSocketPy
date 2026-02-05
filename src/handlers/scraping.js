@@ -585,10 +585,7 @@ async function handleScrapingNextBatch(socket, data) {
         }
 
         if (targets.length === 0) {
-            await db.query(
-                `UPDATE scraping_jobs SET estado = 'Completado', completed_at = NOW(), total = procesados WHERE id = ?`,
-                [job_id]
-            );
+            // No marcar Completado aquí — el Worker lo hará después de flushear resultados
             socket.send(JSON.stringify({ type: 'scraping_done', job_id, total: job.procesados, exitosos: job.exitosos, errores: job.errores }));
             return;
         }
@@ -717,12 +714,32 @@ async function handleScrapingResultBatch(socket, data) {
     }
 }
 
+/**
+ * Worker señala que terminó de procesar y flushear un job
+ * Ahora sí marcamos Completado con los contadores reales
+ */
+async function handleScrapingJobComplete(socket, data) {
+    const { job_id } = data;
+    if (!job_id) return;
+
+    try {
+        await db.query(
+            `UPDATE scraping_jobs SET estado = 'Completado', total = procesados, completed_at = COALESCE(completed_at, NOW()) WHERE id = ? AND estado != 'Completado'`,
+            [job_id]
+        );
+        socket.send(JSON.stringify({ type: 'scraping_job_complete_ack', job_id, ok: true }));
+    } catch (err) {
+        console.error(`[Scraping] Error en scraping_job_complete:`, err.message);
+    }
+}
+
 module.exports = {
     handleRequestScrapingJob,
     handleScrapingNext,
     handleScrapingNextBatch,
     handleScrapingResult,
     handleScrapingResultBatch,
+    handleScrapingJobComplete,
     handleScraperAccountFail,
     handleScraperAccountSuccess
 };

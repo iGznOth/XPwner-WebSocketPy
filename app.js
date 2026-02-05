@@ -8,7 +8,7 @@ const { handleAuth } = require('./src/handlers/auth');
 const { handleRequestAction, handleTaskAccepted, handleTaskRejected, handleNewAction } = require('./src/handlers/actions');
 const { handleStatus, handleProgress, handleTokenFail, handleTokenSuccess, handleTweetSnapshot } = require('./src/handlers/status');
 const { handleRequestWarmerJob, handleWarmerNext, handleWarmerResult } = require('./src/handlers/warmer');
-const { handleRequestScrapingJob, handleScrapingNext, handleScrapingNextBatch, handleScrapingResult, handleScrapingResultBatch, handleScraperAccountFail, handleScraperAccountSuccess } = require('./src/handlers/scraping');
+const { handleRequestScrapingJob, handleScrapingNext, handleScrapingNextBatch, handleScrapingResult, handleScrapingResultBatch, handleScrapingJobComplete, handleScraperAccountFail, handleScraperAccountSuccess } = require('./src/handlers/scraping');
 // boot check removed
 const { handleRequestToken, handleTokenReport, handleRequestTokenBatch, handleTokenReportBatch, cleanupStaleLocks, cleanupOldLogs } = require('./src/handlers/tokenManager');
 const { handleUpdate, handleLog } = require('./src/handlers/monitor');
@@ -183,6 +183,10 @@ wss.on('connection', (socket) => {
                     console.error('[Server] Error en scraping_result_batch:', err.message);
                     socket.send(JSON.stringify({ type: 'scraping_result_batch_ack', job_id: data.job_id, ok: false }));
                 }
+            }
+
+            else if (data.type === 'scraping_job_complete' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
+                await handleScrapingJobComplete(socket, data);
             }
 
             else if (data.type === 'scraper_account_fail' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
