@@ -189,6 +189,7 @@ function handleNewAction(socket, data) {
 
 /**
  * Panel solicita detener una acción → buscar worker y enviarle stop
+ * Flujo: 1) Enviar stop al worker, 2) Actualizar DB
  */
 async function handleStopAction(socket, data) {
     const { action_id } = data;
@@ -208,36 +209,56 @@ async function handleStopAction(socket, data) {
 
         const action = actionRows[0];
 
-        // Si no está en proceso, solo actualizar DB
-        if (!['En Proceso', 'Pendiente de Aceptacion'].includes(action.estado)) {
-            if (['Completado', 'Detenida'].includes(action.estado)) {
-                socket.send(JSON.stringify({ type: 'stop_action_result', action_id, success: false, message: `Ya está ${action.estado}` }));
-                return;
-            }
-            // En Cola, Pausado, etc → marcar directamente
-            await db.query(`UPDATE actions SET estado = 'Detenida' WHERE id = ?`, [action_id]);
-            socket.send(JSON.stringify({ type: 'stop_action_result', action_id, success: true, message: 'Acción detenida' }));
+        // Ya terminada o detenida → no hacer nada
+        if (['Completado', 'Detenida'].includes(action.estado)) {
+            socket.send(JSON.stringify({ type: 'stop_action_result', action_id, success: false, message: `Ya está ${action.estado}` }));
             return;
         }
 
-        // Acción en proceso → enviar comando al worker
-        const userMonitors = getMonitors(socket.userId);
-        let sent = false;
-
-        for (const monitorSocket of userMonitors) {
-            if (monitorSocket.readyState === WebSocket.OPEN && monitorSocket.workerId === action.worker_id) {
-                monitorSocket.send(JSON.stringify({ type: 'stop_action', action_id: action_id }));
-                sent = true;
-                break;
+        // Enviar comando al worker PRIMERO (si está en proceso)
+        let sentToWorker = false;
+        if (['En Proceso', 'Pendiente de Aceptacion'].includes(action.estado) && action.worker_id) {
+            const userMonitors = getMonitors(socket.userId);
+            
+            for (const monitorSocket of userMonitors) {
+                if (monitorSocket.readyState === WebSocket.OPEN && monitorSocket.workerId === action.worker_id) {
+                    monitorSocket.send(JSON.stringify({ type: 'stop_action', action_id: action_id }));
+                    sentToWorker = true;
+                    console.log(`[Actions] Stop enviado a worker ${action.worker_id} para acción ${action_id}`);
+                    break;
+                }
             }
         }
 
-        if (!sent) {
-            // Worker no conectado — marcar directamente en DB
-            await db.query(`UPDATE actions SET estado = 'Detenida', worker_id = NULL WHERE id = ?`, [action_id]);
-            socket.send(JSON.stringify({ type: 'stop_action_result', action_id, success: true, message: 'Acción detenida (worker no conectado)' }));
+        // Actualizar DB (para acciones en cola o si el worker no está conectado)
+        const [updateResult] = await db.query(
+            `UPDATE actions SET estado = 'Detenida', worker_id = NULL WHERE id = ? AND estado NOT IN ('Completado', 'Detenida')`,
+            [action_id]
+        );
+
+        const updated = updateResult.affectedRows > 0;
+
+        if (sentToWorker) {
+            socket.send(JSON.stringify({ 
+                type: 'stop_action_result', 
+                action_id, 
+                success: true, 
+                message: 'Señal de stop enviada al worker' 
+            }));
+        } else if (updated) {
+            socket.send(JSON.stringify({ 
+                type: 'stop_action_result', 
+                action_id, 
+                success: true, 
+                message: 'Acción detenida' 
+            }));
         } else {
-            socket.send(JSON.stringify({ type: 'stop_action_result', action_id, success: true, message: 'Señal de stop enviada al worker' }));
+            socket.send(JSON.stringify({ 
+                type: 'stop_action_result', 
+                action_id, 
+                success: false, 
+                message: 'La acción ya no estaba activa' 
+            }));
         }
     } catch (err) {
         console.error(`[Actions] Error en stop_action ${action_id}:`, err.message);
