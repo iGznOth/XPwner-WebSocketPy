@@ -36,7 +36,7 @@ async function handleAuth(socket, data) {
         }
 
         socket.send(JSON.stringify({ type: 'auth', success: true }));
-        // console.log(`[Auth] Usuario autenticado. ID: ${socket.userId} como ${socket.clientType} con workerId: ${socket.workerId}`);
+        console.log(`[Auth] Usuario autenticado. ID: ${socket.userId} como ${socket.clientType}${socket.workerId ? ` (workerId: ${socket.workerId})` : ''}`);
     } else {
         socket.send(JSON.stringify({ type: 'auth', success: false, error: 'Token inválido' }));
         console.warn('[Auth] Token inválido. Cerrando conexión.');

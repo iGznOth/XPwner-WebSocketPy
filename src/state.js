@@ -71,6 +71,7 @@ function getPanels(userId) {
  */
 function broadcastToPanels(userId, data) {
     const userPanels = panels.get(userId);
+    console.log(`[Broadcast] userId=${userId}, panels=${userPanels ? userPanels.size : 0}, type=${data.type}`);
     if (userPanels) {
         const msg = JSON.stringify(data);
         for (const panelSocket of userPanels) {
