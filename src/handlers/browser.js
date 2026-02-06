@@ -86,13 +86,12 @@ async function handleUnlockNext(socket, data) {
         const filtros = typeof job.filtros === 'string' ? JSON.parse(job.filtros) : (job.filtros || {});
         const lastId = filtros._last_id || 0;
 
-        // Get next locked account
+        // Get next account matching filters
         let query = `
             SELECT xa.id, xa.nick, xa.auth_token, xa.ct0, xa.cookies_full, p.proxy
             FROM xchecker_accounts xa
             LEFT JOIN preconfigs p ON xa.deck_id = p.id
-            WHERE xa.estado_salud = 'locked'
-              AND xa.auth_token IS NOT NULL AND xa.auth_token != ''
+            WHERE xa.auth_token IS NOT NULL AND xa.auth_token != ''
               AND xa.ct0 IS NOT NULL AND xa.ct0 != ''
               AND xa.id > ?
         `;
@@ -106,6 +105,18 @@ async function handleUnlockNext(socket, data) {
         if (filtros.deck_id) {
             query += ` AND xa.deck_id = ?`;
             params.push(filtros.deck_id);
+        }
+        if (filtros.estado) {
+            query += ` AND xa.estado = ?`;
+            params.push(filtros.estado);
+        }
+        if (filtros.estado_salud) {
+            query += ` AND xa.estado_salud = ?`;
+            params.push(filtros.estado_salud);
+        }
+        if (filtros.account_id) {
+            query += ` AND xa.id = ?`;
+            params.push(filtros.account_id);
         }
 
         query += ` ORDER BY xa.id ASC LIMIT 1`;
@@ -252,14 +263,13 @@ async function handleLoginNext(socket, data) {
         const filtros = typeof job.filtros === 'string' ? JSON.parse(job.filtros) : (job.filtros || {});
         const lastId = filtros._last_id || 0;
 
-        // Get next account that needs login (deslogueado or no auth_token)
+        // Get next account that needs login
         let query = `
             SELECT xa.id, xa.nick, xa.password, xa.email, xa.password_email, 
                    xa.base_2fa, xa.phone, p.proxy
             FROM xchecker_accounts xa
             LEFT JOIN preconfigs p ON xa.deck_id = p.id
-            WHERE (xa.estado_salud = 'deslogueado' OR xa.auth_token IS NULL OR xa.auth_token = '')
-              AND xa.password IS NOT NULL AND xa.password != ''
+            WHERE xa.password IS NOT NULL AND xa.password != ''
               AND xa.id > ?
         `;
         const params = [lastId];
@@ -272,6 +282,21 @@ async function handleLoginNext(socket, data) {
         if (filtros.deck_id) {
             query += ` AND xa.deck_id = ?`;
             params.push(filtros.deck_id);
+        }
+        if (filtros.estado) {
+            query += ` AND xa.estado = ?`;
+            params.push(filtros.estado);
+        }
+        if (filtros.estado_salud) {
+            query += ` AND xa.estado_salud = ?`;
+            params.push(filtros.estado_salud);
+        } else {
+            // Default: deslogueado or no auth_token
+            query += ` AND (xa.estado_salud = 'deslogueado' OR xa.auth_token IS NULL OR xa.auth_token = '')`;
+        }
+        if (filtros.account_id) {
+            query += ` AND xa.id = ?`;
+            params.push(filtros.account_id);
         }
 
         query += ` ORDER BY xa.id ASC LIMIT 1`;
