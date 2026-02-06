@@ -1,6 +1,7 @@
 // src/handlers/scraping.js — Scraping job handler
 // Tipos: xchecker_health (health check cuentas), xwarmer_nicks (scrape nicks + tweets)
 const db = require('../db');
+const { broadcastToPanels } = require('../state');
 
 /**
  * Worker solicita un scraping job disponible
@@ -702,7 +703,42 @@ async function handleScrapingResultBatch(socket, data) {
             [okCount + errCount, okCount, errCount, job_id]
         );
 
+        // Obtener job actualizado para broadcast
+        const [updatedJob] = await connection.query(
+            `SELECT procesados, total, exitosos, errores, estado FROM scraping_jobs WHERE id = ?`,
+            [job_id]
+        );
+
         await connection.commit();
+
+        // Broadcast xchecker_update para cada cuenta actualizada
+        for (const r of results) {
+            if (r.target_type === 'xchecker_health' && r.target_id) {
+                const salud = r.result?.estado_salud || 'desconocido';
+                broadcastToPanels(socket.userId, {
+                    type: 'xchecker_update',
+                    account_id: r.target_id,
+                    estado_salud: salud,
+                    fails_consecutivos: salud === 'activo' ? 0 : 1,
+                    updated_at: new Date().toISOString()
+                });
+            }
+        }
+
+        // Broadcast job progress
+        if (updatedJob.length > 0) {
+            const j = updatedJob[0];
+            broadcastToPanels(socket.userId, {
+                type: 'xchecker_job_progress',
+                job_id,
+                procesados: j.procesados,
+                total: j.total,
+                exitosos: j.exitosos,
+                errores: j.errores,
+                estado: j.estado
+            });
+        }
+
         socket.send(JSON.stringify({ type: 'scraping_result_batch_ack', job_id, ok: true, processed: results.length }));
 
     } catch (err) {
@@ -727,6 +763,26 @@ async function handleScrapingJobComplete(socket, data) {
             `UPDATE scraping_jobs SET estado = 'Completado', total = procesados, completed_at = COALESCE(completed_at, NOW()) WHERE id = ? AND estado != 'Completado'`,
             [job_id]
         );
+
+        // Obtener stats finales para broadcast
+        const [jobRows] = await db.query(
+            `SELECT procesados, total, exitosos, errores FROM scraping_jobs WHERE id = ?`,
+            [job_id]
+        );
+
+        if (jobRows.length > 0) {
+            const j = jobRows[0];
+            broadcastToPanels(socket.userId, {
+                type: 'xchecker_job_progress',
+                job_id,
+                procesados: j.procesados,
+                total: j.total,
+                exitosos: j.exitosos,
+                errores: j.errores,
+                estado: 'Completado'
+            });
+        }
+
         socket.send(JSON.stringify({ type: 'scraping_job_complete_ack', job_id, ok: true }));
     } catch (err) {
         console.error(`[Scraping] Error en scraping_job_complete:`, err.message);
