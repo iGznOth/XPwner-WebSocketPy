@@ -309,10 +309,11 @@ async function handleLoginNext(socket, data) {
         if (filtros.estado_salud) {
             query += ` AND xa.estado_salud = ?`;
             params.push(filtros.estado_salud);
-        } else {
-            // Default: deslogueado or no auth_token
+        } else if (!filtros.force_all) {
+            // Default: deslogueado or no auth_token (unless force_all)
             query += ` AND (xa.estado_salud = 'deslogueado' OR xa.auth_token IS NULL OR xa.auth_token = '')`;
         }
+        // force_all: solo requiere password, sin filtro extra
         if (filtros.account_id) {
             query += ` AND xa.id = ?`;
             params.push(filtros.account_id);
