@@ -294,29 +294,30 @@ async function handleLoginNext(socket, data) {
         const params = [lastId];
 
         // Apply filters from job
-        if (filtros.nombre) {
-            query += ` AND xa.nombre = ?`;
-            params.push(filtros.nombre);
-        }
-        if (filtros.deck_id) {
-            query += ` AND xa.deck_id = ?`;
-            params.push(filtros.deck_id);
-        }
-        if (filtros.estado) {
-            query += ` AND xa.estado = ?`;
-            params.push(filtros.estado);
-        }
-        if (filtros.estado_salud) {
-            query += ` AND xa.estado_salud = ?`;
-            params.push(filtros.estado_salud);
-        } else if (!filtros.force_all) {
-            // Default: deslogueado or no auth_token (unless force_all)
-            query += ` AND (xa.estado_salud = 'deslogueado' OR xa.auth_token IS NULL OR xa.auth_token = '')`;
-        }
-        // force_all: solo requiere password, sin filtro extra
+        // If account_id is set, skip all other filters (individual account login)
         if (filtros.account_id) {
             query += ` AND xa.id = ?`;
             params.push(filtros.account_id);
+        } else {
+            if (filtros.nombre) {
+                query += ` AND xa.nombre = ?`;
+                params.push(filtros.nombre);
+            }
+            if (filtros.deck_id) {
+                query += ` AND xa.deck_id = ?`;
+                params.push(filtros.deck_id);
+            }
+            if (filtros.estado) {
+                query += ` AND xa.estado = ?`;
+                params.push(filtros.estado);
+            }
+            if (filtros.estado_salud) {
+                query += ` AND xa.estado_salud = ?`;
+                params.push(filtros.estado_salud);
+            } else if (!filtros.force_all) {
+                // Default: deslogueado or no auth_token (unless force_all)
+                query += ` AND (xa.estado_salud = 'deslogueado' OR xa.auth_token IS NULL OR xa.auth_token = '')`;
+            }
         }
 
         query += ` ORDER BY xa.id ASC LIMIT 1`;
