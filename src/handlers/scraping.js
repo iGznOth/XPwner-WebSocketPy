@@ -634,17 +634,44 @@ async function handleScrapingResultBatch(socket, data) {
                     const salud = result.estado_salud || 'activo';
                     if (salud === 'activo' && result.profile) {
                         const p = result.profile;
+                        
+                        // Parsear set_cookies para actualizar auth_token/ct0 si X los rotó
+                        let newCt0 = null, newAuthToken = null;
+                        if (result.set_cookies && typeof result.set_cookies === 'string') {
+                            const parts = result.set_cookies.split(/[;\n]/).map(s => s.trim()).filter(Boolean);
+                            for (const part of parts) {
+                                const eqIdx = part.indexOf('=');
+                                if (eqIdx === -1) continue;
+                                const key = part.substring(0, eqIdx).trim().toLowerCase();
+                                const val = part.substring(eqIdx + 1).trim();
+                                if (key === 'ct0' && val) newCt0 = val;
+                                if (key === 'auth_token' && val) newAuthToken = val;
+                            }
+                        }
+                        
+                        // Build dynamic query with optional token updates
+                        const setClauses = [
+                            'nick = ?', 'twitter_user_id = ?', 'estado = ?', 'estado_salud = ?',
+                            'followers_count = ?', 'following_count = ?',
+                            "profile_img = CASE WHEN ? != '' THEN ? ELSE profile_img END",
+                            'location = ?', 'bio_descrip = ?', 'bio_link = ?',
+                            'fails_consecutivos = 0', 'ultimo_error = NULL', 'updated_at = NOW()'
+                        ];
+                        const setParams = [
+                            p.screen_name || result.nick, p.twitter_user_id, 'active', 'activo',
+                            p.followers_count || 0, p.following_count || 0,
+                            p.profile_img || '', p.profile_img || '',
+                            p.location || '', p.bio_descrip || '', p.bio_link || ''
+                        ];
+                        
+                        if (newCt0) { setClauses.push('ct0 = ?'); setParams.push(newCt0); }
+                        if (newAuthToken) { setClauses.push('auth_token = ?'); setParams.push(newAuthToken); }
+                        if (result.set_cookies) { setClauses.push('cookies_full = ?'); setParams.push(result.set_cookies); }
+                        
+                        setParams.push(target_id);
                         await connection.query(
-                            `UPDATE xchecker_accounts SET
-                             nick = ?, twitter_user_id = ?, estado = 'active', estado_salud = 'activo',
-                             followers_count = ?, following_count = ?,
-                             profile_img = CASE WHEN ? != '' THEN ? ELSE profile_img END,
-                             location = ?, bio_descrip = ?, bio_link = ?,
-                             fails_consecutivos = 0, ultimo_error = NULL, updated_at = NOW()
-                             WHERE id = ?`,
-                            [p.screen_name || result.nick, p.twitter_user_id, p.followers_count || 0,
-                             p.following_count || 0, p.profile_img || '', p.profile_img || '',
-                             p.location || '', p.bio_descrip || '', p.bio_link || '', target_id]
+                            `UPDATE xchecker_accounts SET ${setClauses.join(', ')} WHERE id = ?`,
+                            setParams
                         );
                     } else {
                         const nuevoEstado = ['suspendido', 'locked', 'deslogueado'].includes(salud) ? 'inactive' : null;
