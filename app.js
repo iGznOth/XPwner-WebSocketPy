@@ -9,6 +9,7 @@ const { handleRequestAction, handleTaskAccepted, handleTaskRejected, handleNewAc
 const { handleStatus, handleProgress, handleTokenFail, handleTokenSuccess, handleTweetSnapshot } = require('./src/handlers/status');
 const { handleRequestWarmerJob, handleWarmerNext, handleWarmerResult } = require('./src/handlers/warmer');
 const { handleRequestScrapingJob, handleScrapingNext, handleScrapingNextBatch, handleScrapingResult, handleScrapingResultBatch, handleScrapingJobComplete, handleScraperAccountFail, handleScraperAccountSuccess } = require('./src/handlers/scraping');
+const { handleRequestBrowserJob, handleUnlockNext, handleUnlockResult, handleLoginNext, handleLoginResult } = require('./src/handlers/browser');
 // boot check removed
 const { handleRequestToken, handleTokenReport, handleRequestTokenBatch, handleTokenReportBatch, cleanupStaleLocks, cleanupOldLogs } = require('./src/handlers/tokenManager');
 const { handleUpdate, handleLog } = require('./src/handlers/monitor');
@@ -223,6 +224,50 @@ wss.on('connection', (socket) => {
 
             else if (data.type === 'scraper_account_success' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
                 await handleScraperAccountSuccess(socket, data);
+            }
+
+            // === BROWSER JOBS — unlock/login (desde monitors) ===
+            else if (data.type === 'request_browser_job' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
+                try {
+                    await handleRequestBrowserJob(socket);
+                } catch (err) {
+                    console.error('[Server] Error en request_browser_job:', err.message);
+                    socket.send(JSON.stringify({ type: 'no_browser_job', reason: 'server_error' }));
+                }
+            }
+
+            else if (data.type === 'unlock_next' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
+                try {
+                    await handleUnlockNext(socket, data);
+                } catch (err) {
+                    console.error('[Server] Error en unlock_next:', err.message);
+                    socket.send(JSON.stringify({ type: 'unlock_done', job_id: data.job_id, error: err.message }));
+                }
+            }
+
+            else if (data.type === 'unlock_result' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
+                try {
+                    await handleUnlockResult(socket, data);
+                } catch (err) {
+                    console.error('[Server] Error en unlock_result:', err.message);
+                }
+            }
+
+            else if (data.type === 'login_next' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
+                try {
+                    await handleLoginNext(socket, data);
+                } catch (err) {
+                    console.error('[Server] Error en login_next:', err.message);
+                    socket.send(JSON.stringify({ type: 'login_done', job_id: data.job_id, error: err.message }));
+                }
+            }
+
+            else if (data.type === 'login_result' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
+                try {
+                    await handleLoginResult(socket, data);
+                } catch (err) {
+                    console.error('[Server] Error en login_result:', err.message);
+                }
             }
 
             // === MÉTRICAS Y LOGS (desde monitors) ===
