@@ -2,6 +2,7 @@
 // xWarmer health updates ahora se manejan en warmer.js
 const db = require('../db');
 const { sendCompletionNotification } = require('./telegram');
+const { broadcastToPanels } = require('../state');
 
 /**
  * Worker reporta status de una acción (Completado / Error)
@@ -34,7 +35,14 @@ async function handleStatus(socket, data) {
                 await db.query(`UPDATE actions SET media = NULL WHERE id = ? AND media IS NOT NULL`, [action_id]);
             }
 
-            // console.log(`[Status] Acción ${action_id} actualizada: ${status}`);
+            // Broadcast a panels para actualización en tiempo real
+            broadcastToPanels(socket.userId, {
+                type: 'action_update',
+                action_id: action_id,
+                status: status,
+                tipo: tipo,
+                message: commentToSave
+            });
 
             // Notificación Telegram solo al completar
             if (status === 'Completado') {
@@ -54,15 +62,25 @@ async function handleStatus(socket, data) {
  * Worker reporta progreso de una acción
  */
 async function handleProgress(socket, data) {
-    const { action_id, cantidad } = data;
+    const { action_id, cantidad, tipo } = data;
 
-    const [actionRows] = await db.query('SELECT worker_id FROM actions WHERE id = ?', [action_id]);
+    const [actionRows] = await db.query('SELECT worker_id, tipo, acciones_realizadas, cantidad as total FROM actions WHERE id = ?', [action_id]);
     if (actionRows.length > 0 && actionRows[0].worker_id === socket.workerId) {
+        const newRealizadas = (actionRows[0].acciones_realizadas || 0) + cantidad;
+        
         await db.query(
-            'UPDATE actions SET estado = CASE WHEN estado NOT IN (\'Completado\', \'Error\') THEN \'En Proceso\' ELSE estado END, acciones_realizadas = acciones_realizadas + ? WHERE id = ?',
+            'UPDATE actions SET estado = CASE WHEN estado NOT IN (\'Completado\', \'Error\', \'Detenida\') THEN \'En Proceso\' ELSE estado END, acciones_realizadas = acciones_realizadas + ? WHERE id = ?',
             [cantidad, action_id]
         );
-        // console.log(`[Status] Progreso: Acción ${action_id} +${cantidad} por worker ${socket.workerId}`);
+        
+        // Broadcast progreso a panels
+        broadcastToPanels(socket.userId, {
+            type: 'action_progress',
+            action_id: action_id,
+            tipo: actionRows[0].tipo || tipo,
+            realizadas: newRealizadas,
+            total: actionRows[0].total
+        });
     }
 }
 
