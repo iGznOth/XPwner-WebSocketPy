@@ -207,6 +207,13 @@ async function handleUnlockResult(socket, data) {
                 [account_id]
             );
             console.log(`[Browser] @${nick} suspended`);
+        } else if (status === 'appeals') {
+            // Permanently locked — needs manual appeal
+            await db.query(
+                `UPDATE xchecker_accounts SET estado_salud = 'appeals', estado = 'inactive', updated_at = NOW() WHERE id = ?`,
+                [account_id]
+            );
+            console.log(`[Browser] @${nick} permanently locked (needs appeal)`);
         } else {
             // Other failure — keep as locked, maybe increment fails
             console.log(`[Browser] @${nick} unlock failed: ${status}`);
