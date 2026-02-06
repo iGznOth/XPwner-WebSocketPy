@@ -214,6 +214,13 @@ async function handleUnlockResult(socket, data) {
                 [account_id]
             );
             console.log(`[Browser] @${nick} permanently locked (needs appeal)`);
+        } else if (status === 'dead') {
+            // Dead — irrecoverable account (no reset methods, appeals redirect, etc.)
+            await db.query(
+                `UPDATE xchecker_accounts SET estado_salud = 'dead', estado = 'inactive', updated_at = NOW() WHERE id = ?`,
+                [account_id]
+            );
+            console.log(`[Browser] @${nick} dead (irrecoverable)`);
         } else {
             // Other failure — keep as locked, maybe increment fails
             console.log(`[Browser] @${nick} unlock failed: ${status}`);
@@ -235,7 +242,9 @@ async function handleUnlockResult(socket, data) {
             account_id: account_id,
             estado_salud: status === 'unlocked' ? 'activo' : 
                           status === 'token_dead' ? 'deslogueado' :
-                          status === 'suspended' ? 'suspendido' : 'locked'
+                          status === 'suspended' ? 'suspendido' :
+                          status === 'appeals' ? 'appeals' :
+                          status === 'dead' ? 'dead' : 'locked'
         });
 
         socket.send(JSON.stringify({ type: 'unlock_result_ack', account_id, status }));
