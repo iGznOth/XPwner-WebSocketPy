@@ -14,10 +14,13 @@
 - **Soporte acciones** — Retweet, Favoritos, Comentario, Quote, Reportar, Bookmark, View, Poll
 - **Tweet Snapshot** — Almacena captura del tweet al completar acción (JSON en DB)
 - **Push instantáneo** — Panel notifica nuevas acciones, Workers las reciben en <100ms
+- **Real-time panels** — Broadcast de updates a panels (action_update, xchecker_update, progress)
+- **Stop actions** — Cancelación de acciones en ejecución bajo demanda
 - **Multi-worker** — Múltiples Workers por cuenta con asignación por `worker_id`
 - **Race-condition safe** — Transacciones MySQL con `FOR UPDATE` para asignación atómica
 - **Token Health** — Tracking automático de salud de tokens (activo/enfermo/muerto)
 - **XWarmer** — Soporte para acciones de calentamiento de cuentas
+- **XSpammer** — Módulo separado con polling independiente y APM configurable
 - **Telegram** — Notificaciones automáticas al completar acciones
 - **Auto-recovery** — Limpia acciones pendientes al desconectarse un Worker
 - **Monitoreo** — CPU/RAM del Worker en tiempo real hacia el Panel
@@ -187,5 +190,5 @@ mysql -u user -p database < migrations/001_token_health.sql
 ---
 
 <p align="center">
-  <sub>XPwner WebSocket v2.3 · El cerebro que conecta todo 🔌</sub>
+  <sub>XPwner WebSocket v2.7 · El cerebro que conecta todo 🔌</sub>
 </p>

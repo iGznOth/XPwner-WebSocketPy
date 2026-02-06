@@ -1,5 +1,35 @@
 # CHANGELOG — XPwner WebSocket
 
+## v2.7.0 — 2026-02-05
+
+### xSpammer Worker Integration
+- **Módulo separado**: acciones xSpammer se filtran aparte (no compiten con normales)
+- `handleRequestAction` soporta parámetro `modulo`
+- APM se obtiene del `xspammer_module` para acciones xSpammer
+- Acciones normales excluyen `modulo='xSpammer'`
+
+### Stop Action Handler
+- **`handleStopAction`**: reenvía señal de stop al Worker ANTES de actualizar DB
+- Worker puede cancelar acciones en ejecución bajo demanda
+
+### Real-time Panel Updates
+- **`action_update`**: broadcast a panels cuando una acción empieza a procesarse
+- **`xchecker_update`**: broadcast actualizaciones de cuentas xchecker en tiempo real
+- **`xchecker_job_progress`**: progreso de jobs de scraping en tiempo real
+- Panels ya no necesitan recargar tablas manualmente
+
+### Scraping Improvements
+- **Batch handlers**: `scraping_next_batch` + `scraping_result_batch` para mejor performance
+- Fix: no sobreescribir `profile_img` con string vacío
+- Fix: no marcar job Completado con targets vacíos — esperar `scraping_job_complete` del Worker
+- Fix: remover lock `FOR UPDATE` de `scraping_next_batch` para evitar contención
+- Fix: reset completo de scraping job al desconectar (`_last_id` + contadores)
+- Dynamic filter builder para targets de jobs
+
+### Fixes
+- Fix: APM usa `a.apm` directamente (ya tiene rate/period calculado)
+- Silenciados logs verbosos, solo errores y startup
+
 ## v2.6.3 — 2026-02-05
 
 ### Fix acciones huérfanas al reconectar worker
