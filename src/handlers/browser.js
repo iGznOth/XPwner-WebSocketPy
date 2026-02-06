@@ -7,6 +7,8 @@ const { broadcastToPanels } = require('../state');
  * Worker requests a browser job (unlock or login)
  */
 async function handleRequestBrowserJob(socket) {
+    console.log(`[Browser] Worker ${socket.workerId} requesting browser job...`);
+    
     const connection = await db.getConnection();
     await connection.beginTransaction();
 
@@ -23,6 +25,7 @@ async function handleRequestBrowserJob(socket) {
 
         if (jobs.length === 0) {
             await connection.commit();
+            console.log(`[Browser] No jobs available for worker ${socket.workerId}`);
             socket.send(JSON.stringify({ type: 'no_browser_job' }));
             return;
         }
