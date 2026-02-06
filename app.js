@@ -93,6 +93,7 @@ wss.on('connection', (socket) => {
             }
 
             else if (data.type === 'progreso' && socket.isAlive && socket.userId && socket.clientType === 'monitor') {
+                console.log(`[Progreso] Recibido de worker ${socket.workerId}:`, data);
                 await handleProgress(socket, data);
             }
 

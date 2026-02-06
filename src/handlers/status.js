@@ -78,6 +78,7 @@ async function handleProgress(socket, data) {
         
         // Si es el primer progreso (cambió de En Cola a En Proceso), enviar action_update
         if (prevRealizadas === 0 && prevEstado === 'En Cola') {
+            console.log(`[Progreso] Enviando action_update (En Cola → En Proceso) para #${action_id}`);
             broadcastToPanels(socket.userId, {
                 type: 'action_update',
                 action_id: action_id,
@@ -88,6 +89,7 @@ async function handleProgress(socket, data) {
         }
         
         // Broadcast progreso a panels
+        console.log(`[Progreso] Broadcasting action_progress #${action_id}: ${newRealizadas}/${actionRows[0].total}`);
         broadcastToPanels(socket.userId, {
             type: 'action_progress',
             action_id: action_id,
