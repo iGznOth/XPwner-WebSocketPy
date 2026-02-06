@@ -16,6 +16,7 @@ async function handleRequestScrapingJob(socket) {
             `SELECT id, tipo, total, procesados, filtros
              FROM scraping_jobs
              WHERE estado = 'En Cola'
+               AND tipo NOT IN ('unlock', 'login')
              ORDER BY created_at ASC
              LIMIT 1
              FOR UPDATE`,
