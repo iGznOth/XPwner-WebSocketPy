@@ -121,6 +121,11 @@ async function handleUnlockNext(socket, data) {
             query += ` AND xa.id = ?`;
             params.push(filtros.account_id);
         }
+        if (filtros.search) {
+            query += ` AND (xa.nick LIKE ? OR xa.comentario LIKE ? OR xa.nombre LIKE ? OR xa.email LIKE ?)`;
+            const like = `%${filtros.search}%`;
+            params.push(like, like, like, like);
+        }
 
         query += ` ORDER BY xa.id ASC LIMIT 1`;
 
@@ -332,6 +337,11 @@ async function handleLoginNext(socket, data) {
             } else if (!filtros.force_all) {
                 // Default: deslogueado or no auth_token (unless force_all)
                 query += ` AND (xa.estado_salud = 'deslogueado' OR xa.auth_token IS NULL OR xa.auth_token = '')`;
+            }
+            if (filtros.search) {
+                query += ` AND (xa.nick LIKE ? OR xa.comentario LIKE ? OR xa.nombre LIKE ? OR xa.email LIKE ?)`;
+                const like = `%${filtros.search}%`;
+                params.push(like, like, like, like);
             }
         }
 

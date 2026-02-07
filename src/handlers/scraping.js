@@ -154,6 +154,11 @@ async function handleScrapingNext(socket, data) {
                 whereParts.push('xa.estado_salud = ?');
                 whereParams.push(filtros.estado_salud);
             }
+            if (filtros.search) {
+                whereParts.push('(xa.nick LIKE ? OR xa.comentario LIKE ? OR xa.nombre LIKE ? OR xa.email LIKE ?)');
+                const like = `%${filtros.search}%`;
+                whereParams.push(like, like, like, like);
+            }
 
             const [accounts] = await connection.query(
                 `SELECT xa.id, xa.nick, xa.auth_token, xa.ct0, xa.twitter_user_id, 
@@ -530,6 +535,11 @@ async function handleScrapingNextBatch(socket, data) {
             if (filtros.nombre) { whereParts.push('xa.nombre = ?'); whereParams.push(filtros.nombre); }
             if (filtros.estado) { whereParts.push('xa.estado = ?'); whereParams.push(filtros.estado); }
             if (filtros.estado_salud) { whereParts.push('xa.estado_salud = ?'); whereParams.push(filtros.estado_salud); }
+            if (filtros.search) {
+                whereParts.push('(xa.nick LIKE ? OR xa.comentario LIKE ? OR xa.nombre LIKE ? OR xa.email LIKE ?)');
+                const like = `%${filtros.search}%`;
+                whereParams.push(like, like, like, like);
+            }
 
             const [rows] = await db.query(
                 `SELECT xa.id, xa.nick, xa.auth_token, xa.ct0, xa.twitter_user_id,
