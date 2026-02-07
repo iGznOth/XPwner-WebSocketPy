@@ -1,6 +1,7 @@
 // src/handlers/warmer.js — xWarmer job-based handler
 // Flujo: Worker pide job → pide cuenta+destino uno a uno → reporta resultado
 const db = require('../db');
+const errorRules = require('./errorRules');
 
 /**
  * Worker solicita un warmer job disponible
@@ -258,31 +259,19 @@ async function handleWarmerResult(socket, data) {
                 [account_id]
             );
         } else {
-            // Analizar error para estado de salud
-            let estadoSalud = 'activo';
-            const errStr = (error_msg || error_code || '').toLowerCase();
+            // Usar error rules dinámicas
+            await errorRules.processError(connection, {
+                account_id: account_id,
+                action_id: job_id,
+                module: 'xwarmer',
+                error_code: error_code,
+                error_message: error_msg
+            }, true);
 
-            if (errStr.includes('could not authenticate') || errStr.includes('deslogueado') || errStr.includes('401')) {
-                estadoSalud = 'deslogueado';
-            } else if (errStr.includes('suspended') || errStr.includes('suspendido')) {
-                estadoSalud = 'suspendido';
-            } else if (errStr.includes('rate limit') || errStr.includes('429')) {
-                estadoSalud = 'rate_limited';
-            }
-
+            // Unlock
             await connection.query(
-                `UPDATE xchecker_accounts SET 
-                    ultimo_uso = NOW(),
-                    fails_consecutivos = fails_consecutivos + 1,
-                    ultimo_error = ?,
-                    estado_salud = CASE 
-                        WHEN ? != 'activo' THEN ?
-                        WHEN fails_consecutivos + 1 >= 10 THEN 'muerto'
-                        ELSE estado_salud
-                    END,
-                    locked = 0, locked_by = NULL, locked_at = NULL
-                WHERE id = ?`,
-                [error_msg || 'xwarmer error', estadoSalud, estadoSalud, account_id]
+                `UPDATE xchecker_accounts SET ultimo_uso = NOW(), locked = 0, locked_by = NULL, locked_at = NULL WHERE id = ?`,
+                [account_id]
             );
         }
 

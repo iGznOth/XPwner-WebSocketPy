@@ -1,6 +1,8 @@
 // src/handlers/tokenManager.js — Gestión inteligente de tokens v2
 // Asignación con locking, reporte de salud, actualización de cookies
 const db = require('../db');
+const errorRules = require('./errorRules');
+const errorRules = require('./errorRules');
 
 /**
  * Worker solicita un token para ejecutar una acción
@@ -186,31 +188,21 @@ async function handleTokenReport(socket, data) {
                 [token_id]
             );
         } else {
-            // Fallo: analizar error y actualizar estado
-            let estadoSalud = 'activo';
-            const errorStr = (error_code || '').toLowerCase();
+            // Fallo: usar error rules dinámicas
+            await errorRules.processError(connection, {
+                account_id: token_id,
+                action_id: null,
+                module: action_type,
+                error_code: error_code,
+                error_message: error_code
+            }, false);
 
-            if (errorStr.includes('could not authenticate') || errorStr.includes('deslogueado') || errorStr.includes('401')) {
-                estadoSalud = 'deslogueado';
-            } else if (errorStr.includes('suspended') || errorStr.includes('suspendido')) {
-                estadoSalud = 'suspendido';
-            } else if (errorStr.includes('rate limit') || errorStr.includes('429')) {
-                estadoSalud = 'rate_limited';
-            }
-
+            // Unlock + update ultimo_uso
             await connection.query(
-                `UPDATE xchecker_accounts SET 
-                    ultimo_uso = NOW(),
-                    fails_consecutivos = fails_consecutivos + 1,
-                    ultimo_error = ?,
-                    estado_salud = CASE 
-                        WHEN ? != 'activo' THEN ?
-                        WHEN fails_consecutivos + 1 >= 10 THEN 'muerto'
-                        ELSE estado_salud
-                    END
+                `UPDATE xchecker_accounts SET ultimo_uso = NOW()
                     ${isView ? '' : ", locked = 0, locked_by = NULL, locked_at = NULL"}
                 WHERE id = ?`,
-                [error_code || 'unknown', estadoSalud, estadoSalud, token_id]
+                [token_id]
             );
         }
 
@@ -461,24 +453,20 @@ async function handleTokenReportBatch(socket, data) {
                     [token_id]
                 );
             } else {
-                let estadoSalud = 'activo';
-                const errStr = (error_code || '').toLowerCase();
-                if (errStr.includes('could not authenticate') || errStr.includes('401')) estadoSalud = 'deslogueado';
-                else if (errStr.includes('suspended')) estadoSalud = 'suspendido';
-                else if (errStr.includes('rate limit') || errStr.includes('429')) estadoSalud = 'rate_limited';
+                // Fallo: usar error rules dinámicas
+                await errorRules.processError(connection, {
+                    account_id: token_id,
+                    action_id: null,
+                    module: action_type,
+                    error_code: error_code,
+                    error_message: error_code
+                }, false);
 
                 await connection.query(
-                    `UPDATE xchecker_accounts SET 
-                        ultimo_uso = NOW(), fails_consecutivos = fails_consecutivos + 1,
-                        ultimo_error = ?,
-                        estado_salud = CASE 
-                            WHEN ? != 'activo' THEN ?
-                            WHEN fails_consecutivos + 1 >= 10 THEN 'muerto'
-                            ELSE estado_salud
-                        END
+                    `UPDATE xchecker_accounts SET ultimo_uso = NOW()
                         ${isView ? '' : ", locked = 0, locked_by = NULL, locked_at = NULL"}
                     WHERE id = ?`,
-                    [error_code || 'unknown', estadoSalud, estadoSalud, token_id]
+                    [token_id]
                 );
             }
         }
