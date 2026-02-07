@@ -2,7 +2,6 @@
 // Asignación con locking, reporte de salud, actualización de cookies
 const db = require('../db');
 const errorRules = require('./errorRules');
-const errorRules = require('./errorRules');
 
 /**
  * Worker solicita un token para ejecutar una acción
