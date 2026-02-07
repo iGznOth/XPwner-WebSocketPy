@@ -43,7 +43,6 @@ async function handleRequestAction(socket, data) {
                 a.xspammer_module_id,
                 COALESCE(p.proxy, NULL) AS proxy,
                 COALESCE(p.proxy_request, NULL) AS proxy_request,
-                COALESCE(p.tokens, NULL) AS tokens,
                 COALESCE(p.chatid, NULL) AS chatid,
                 COALESCE(a.apm, 60) AS apm
             FROM actions a 
@@ -80,7 +79,6 @@ async function handleRequestAction(socket, data) {
                     cantidad: action.cantidad,
                     proxy: action.proxy,
                     proxy_request: action.proxy_request || null,
-                    tokens: action.tokens,
                     apm: actionApm,
                     comentarios: action.comentario,
                     util: action.util,
