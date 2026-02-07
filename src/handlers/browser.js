@@ -182,16 +182,23 @@ async function handleUnlockNext(socket, data) {
  * Worker reports unlock result
  */
 async function handleUnlockResult(socket, data) {
-    const { job_id, account_id, nick, status, new_auth_token, new_ct0 } = data;
+    const { job_id, account_id, nick, status, new_auth_token, new_ct0, cookies_full } = data;
 
     try {
         // Update account based on result
         if (status === 'unlocked') {
-            // Success — set estado_salud back to activo, update tokens if provided
+            // Success — set estado_salud back to activo, update tokens and cookies if provided
             if (new_auth_token && new_ct0) {
+                const setClauses = ['auth_token = ?', 'ct0 = ?', "estado_salud = 'activo'", 'updated_at = NOW()'];
+                const setParams = [new_auth_token, new_ct0];
+                if (cookies_full) {
+                    setClauses.push('cookies_full = ?');
+                    setParams.push(cookies_full);
+                }
+                setParams.push(account_id);
                 await db.query(
-                    `UPDATE xchecker_accounts SET auth_token = ?, ct0 = ?, estado_salud = 'activo', updated_at = NOW() WHERE id = ?`,
-                    [new_auth_token, new_ct0, account_id]
+                    `UPDATE xchecker_accounts SET ${setClauses.join(', ')} WHERE id = ?`,
+                    setParams
                 );
                 console.log(`[Browser] @${nick} unlocked + tokens updated`);
             } else {
@@ -389,16 +396,21 @@ async function handleLoginNext(socket, data) {
  * Worker reports login result
  */
 async function handleLoginResult(socket, data) {
-    const { job_id, account_id, nick, status, new_auth_token, new_ct0 } = data;
+    const { job_id, account_id, nick, status, new_auth_token, new_ct0, cookies_full } = data;
 
     try {
         if (status === 'ok' && new_auth_token && new_ct0) {
-            // Success — update tokens and estado_salud
+            // Success — update tokens, cookies and estado_salud
+            const setClauses = ['auth_token = ?', 'ct0 = ?', "estado_salud = 'activo'", 'updated_at = NOW()'];
+            const setParams = [new_auth_token, new_ct0];
+            if (cookies_full) {
+                setClauses.push('cookies_full = ?');
+                setParams.push(cookies_full);
+            }
+            setParams.push(account_id);
             await db.query(
-                `UPDATE xchecker_accounts 
-                 SET auth_token = ?, ct0 = ?, estado_salud = 'activo', updated_at = NOW() 
-                 WHERE id = ?`,
-                [new_auth_token, new_ct0, account_id]
+                `UPDATE xchecker_accounts SET ${setClauses.join(', ')} WHERE id = ?`,
+                setParams
             );
             console.log(`[Browser] @${nick} logged in successfully`);
         } else if (status === 'suspended') {
