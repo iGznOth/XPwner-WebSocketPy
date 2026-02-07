@@ -1,5 +1,34 @@
 # CHANGELOG — XPwner WebSocket
 
+## v2.8.0 — 2026-02-07
+
+### 🔓 Browser Job Handlers
+- **Unlock handler**: desbloqueo de cuentas via Camoufox + YesCaptcha
+- **Login handler**: login de cuentas via Chrome (nodriver)
+- **Individual actions**: soporta unlock/login por `account_id` específico
+- **Filter respect**: respeta todos los filtros del job (deck, status, etc.)
+
+### 💀 Dead State Support
+- **Estado dead**: para cuentas irrecuperables (suspendidas permanentemente)
+- **Appeals status**: detecta cuentas en proceso de apelación permanente
+- Nuevo valor en `estado_salud`: `dead`
+
+### 🍪 Cookies Management
+- **cookies_full**: guarda cookies completas en unlock/login exitoso
+- **auth_token/ct0**: actualiza tokens desde scraping `set_cookies`
+
+### 🧹 DB Cleanup
+- Eliminadas referencias a tablas borradas:
+  - `monitors`
+  - `log`
+  - `xspammer_accounts`
+  - `token_health`
+- Fix: removed `p.tokens` reference from actions query
+
+### 🔧 Fixes
+- Fix: individual login by `account_id` skips status filters
+- Fix: exclude unlock/login from scraping handler routing
+
 ## v2.7.0 — 2026-02-05
 
 ### xSpammer Worker Integration
