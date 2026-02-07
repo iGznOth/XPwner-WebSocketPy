@@ -187,13 +187,27 @@ async function handleTokenReport(socket, data) {
                 [token_id]
             );
         } else {
-            // Fallo: usar error rules dinámicas
+            // Fallo: extraer código numérico si viene en JSON
+            let numericCode = null;
+            const errStr = error_code || '';
+            try {
+                const parsed = JSON.parse(errStr);
+                if (parsed.errors && parsed.errors[0] && parsed.errors[0].code) {
+                    numericCode = parsed.errors[0].code;
+                }
+            } catch(e) {
+                // No es JSON, intentar extraer número
+                const m = errStr.match(/\b(\d{3})\b/);
+                if (m) numericCode = parseInt(m[1]);
+            }
+
+            // Usar error rules dinámicas
             await errorRules.processError(connection, {
                 account_id: token_id,
                 action_id: null,
                 module: action_type,
-                error_code: error_code,
-                error_message: error_code
+                error_code: numericCode,
+                error_message: errStr
             }, false);
 
             // Unlock + update ultimo_uso
@@ -452,13 +466,25 @@ async function handleTokenReportBatch(socket, data) {
                     [token_id]
                 );
             } else {
-                // Fallo: usar error rules dinámicas
+                // Extraer código numérico si viene en JSON
+                let numericCode = null;
+                const errStr = error_code || '';
+                try {
+                    const parsed = JSON.parse(errStr);
+                    if (parsed.errors && parsed.errors[0] && parsed.errors[0].code) {
+                        numericCode = parsed.errors[0].code;
+                    }
+                } catch(e) {
+                    const m = errStr.match(/\b(\d{3})\b/);
+                    if (m) numericCode = parseInt(m[1]);
+                }
+
                 await errorRules.processError(connection, {
                     account_id: token_id,
                     action_id: null,
                     module: action_type,
-                    error_code: error_code,
-                    error_message: error_code
+                    error_code: numericCode,
+                    error_message: errStr
                 }, false);
 
                 await connection.query(
