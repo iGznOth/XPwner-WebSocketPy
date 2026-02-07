@@ -187,12 +187,20 @@ async function handleUnlockResult(socket, data) {
     try {
         // Update account based on result
         if (status === 'unlocked') {
-            // Success — set estado_salud back to activo
-            await db.query(
-                `UPDATE xchecker_accounts SET estado_salud = 'activo', updated_at = NOW() WHERE id = ?`,
-                [account_id]
-            );
-            console.log(`[Browser] @${nick} unlocked successfully`);
+            // Success — set estado_salud back to activo, update tokens if provided
+            if (new_auth_token && new_ct0) {
+                await db.query(
+                    `UPDATE xchecker_accounts SET auth_token = ?, ct0 = ?, estado_salud = 'activo', updated_at = NOW() WHERE id = ?`,
+                    [new_auth_token, new_ct0, account_id]
+                );
+                console.log(`[Browser] @${nick} unlocked + tokens updated`);
+            } else {
+                await db.query(
+                    `UPDATE xchecker_accounts SET estado_salud = 'activo', updated_at = NOW() WHERE id = ?`,
+                    [account_id]
+                );
+                console.log(`[Browser] @${nick} unlocked successfully`);
+            }
         } else if (status === 'token_dead') {
             // Token dead — mark as deslogueado
             await db.query(
