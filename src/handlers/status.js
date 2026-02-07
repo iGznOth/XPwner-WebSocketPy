@@ -108,19 +108,19 @@ async function handleTokenFail(socket, data) {
     if (!auth_token || !socket.userId) return;
 
     try {
+        // Actualizar directamente en xchecker_accounts
         await db.query(`
-            INSERT INTO token_health (cuentas_id, auth_token, fails_consecutivos, ultimo_error, ultimo_uso, estado)
-            VALUES (?, ?, 1, ?, NOW(), 'activo')
-            ON DUPLICATE KEY UPDATE
+            UPDATE xchecker_accounts SET 
                 fails_consecutivos = fails_consecutivos + 1,
-                ultimo_error = VALUES(ultimo_error),
+                ultimo_error = ?,
                 ultimo_uso = NOW(),
-                estado = CASE 
-                    WHEN fails_consecutivos + 1 >= 10 THEN 'muerto'
-                    WHEN fails_consecutivos + 1 >= 5 THEN 'enfermo'
-                    ELSE 'activo'
+                estado_salud = CASE 
+                    WHEN fails_consecutivos + 1 >= 10 THEN 'dead'
+                    WHEN fails_consecutivos + 1 >= 5 THEN 'rate_limited'
+                    ELSE estado_salud
                 END
-        `, [socket.userId, auth_token, error_msg || 'unknown']);
+            WHERE auth_token = ?
+        `, [error_msg || 'unknown', auth_token]);
     } catch (err) {
         console.error(`[TokenHealth] Error guardando token fail:`, err.message);
     }
@@ -134,11 +134,12 @@ async function handleTokenSuccess(socket, data) {
     if (!auth_token || !socket.userId) return;
 
     try {
+        // Actualizar directamente en xchecker_accounts
         await db.query(`
-            UPDATE token_health 
-            SET fails_consecutivos = 0, estado = 'activo', ultimo_uso = NOW()
-            WHERE cuentas_id = ? AND auth_token = ?
-        `, [socket.userId, auth_token]);
+            UPDATE xchecker_accounts 
+            SET fails_consecutivos = 0, estado_salud = 'activo', ultimo_uso = NOW()
+            WHERE auth_token = ?
+        `, [auth_token]);
     } catch (err) { /* Silencioso */ }
 }
 

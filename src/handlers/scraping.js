@@ -36,12 +36,15 @@ async function handleRequestScrapingJob(socket) {
             [socket.workerId, job.id]
         );
 
-        // Cargar TODAS las scraper accounts activas
+        // Cargar cuentas scraper desde xchecker_accounts (cuentas activas con auth)
         const [scraperAccounts] = await connection.query(
-            `SELECT id, auth_token, ct0, proxy
-             FROM xspammer_accounts
-             WHERE estado = 'active'
-             ORDER BY last_use ASC`
+            `SELECT id, auth_token, ct0, NULL as proxy
+             FROM xchecker_accounts
+             WHERE estado = 'active' 
+               AND estado_salud IN ('activo', 'desconocido')
+               AND auth_token IS NOT NULL AND auth_token != ''
+             ORDER BY ultimo_uso ASC
+             LIMIT 50`
         );
 
         await connection.commit();
@@ -441,8 +444,8 @@ async function handleScraperAccountFail(socket, data) {
         if (error_type === 'proxy') estado = 'proxy_error';
 
         await db.query(
-            `UPDATE xspammer_accounts SET 
-             estado = ?, ultimo_error = ?, fails_consecutivos = fails_consecutivos + 1,
+            `UPDATE xchecker_accounts SET 
+             estado_salud = ?, ultimo_error = ?, fails_consecutivos = fails_consecutivos + 1,
              updated_at = NOW()
              WHERE id = ?`,
             [estado, (error_msg || '').substring(0, 500), scraper_id]
@@ -465,8 +468,8 @@ async function handleScraperAccountSuccess(socket, data) {
 
     try {
         await db.query(
-            `UPDATE xspammer_accounts SET 
-             estado = 'active', fails_consecutivos = 0, last_use = NOW()
+            `UPDATE xchecker_accounts SET 
+             estado_salud = 'activo', fails_consecutivos = 0, ultimo_uso = NOW()
              WHERE id = ?`,
             [scraper_id]
         );
